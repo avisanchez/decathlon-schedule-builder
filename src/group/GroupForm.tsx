@@ -24,7 +24,7 @@ function GroupForm({ onSubmit }: { onSubmit?: (numGroups: number) => void }) {
             return
         }
         console.log(`Updated the number of groups to ${numGroups}`)
-        onSubmit(numGroups)
+        onSubmit && onSubmit(numGroups)
     }
 
     return (
