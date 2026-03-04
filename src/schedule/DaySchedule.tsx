@@ -13,29 +13,29 @@ function DayScheduleView() {
 
     let s = new Scheduler(groups, activities);
 
-    let [daySchedule, setDaySchedule] = useState<DaySchedule>(s.daySchedule)
+    let [daySchedule, setDaySchedule] = useState<DaySchedule>([])
 
     return (
         <>
             <table>
-                {
-                    daySchedule.map(groupSchedule => {
-                        return (
-                            <tr>
-                                {groupSchedule.map(activity => {
-                                    return (
-                                        <td>{activity?.code ?? "null"}</td>
-                                    )
-                                })}
-                            </tr>
-                        )
-                    })
-                }
+                <tbody>
+                    {
+                        daySchedule.map((groupSchedule, i) => {
+                            return (
+                                <tr key={`${i}`}>
+                                    {groupSchedule.map((activity, j) => {
+                                        return (
+                                            <td key={`${i}-${j}`}>{activity?.code ?? "null"}</td>
+                                        )
+                                    })}
+                                </tr>
+                            )
+                        })
+                    }
+                </tbody>
             </table>
             <button onClick={() => {
-                console.log("submit")
-                s.genDaySchedule();
-                setDaySchedule(s.daySchedule);
+                setDaySchedule(s.genDaySchedule());
             }}>Generate Schedule</button>
         </>
 
