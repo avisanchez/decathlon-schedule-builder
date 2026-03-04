@@ -4,6 +4,8 @@ import GroupCard from "./group/GroupCard"
 import GroupSettings from "./group/GroupSettings"
 import { Gender, Group } from "./group/types"
 import ActivityList from "./activity/ActivityList";
+import DaySchedule from "./schedule/DaySchedule";
+import DayScheduleView from "./schedule/DaySchedule";
 
 function App() {
   return (
@@ -13,6 +15,7 @@ function App() {
         <Route path="/GroupForm" element={<GroupForm onSubmit={(numGroups: number) => { console.log(numGroups) }} />} />
         <Route path="/GroupSettings" element={<GroupSettings />} />
         <Route path="/ActivityList" element={<ActivityList />} />
+        <Route path="/DaySchedule" element={<DayScheduleView />} />
       </Routes>
     </BrowserRouter>
   );
