@@ -1,0 +1,4 @@
+# Hurdles
+
+## Keeping project in ~/Desktop
+This project previously existed in ~/Desktop. By default, my computer had enabled a setting that saved storage by moving less frequently used files in my Desktop to iCloud. If I needed to access the file, it would be downloaded from iCloud. The issue is that this process became stuck, and crucial files in my git directory were never downloaded. This caused unexpected behavior, like infinitley hanging git commands and also sometimes and inability to run the dev server since important files were being locked until iCloud downloaded them (which it got stuck doing). The solution was to move the folder out of desktop. I opted to create a ~/Developer folder which would hold my future programming projects. The caveat is that it is not iCloud synced, and thus would rely on a system like GitHub to enable file syncing across devices.

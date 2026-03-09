@@ -5,7 +5,7 @@ export enum Gender {
 }
 
 export interface Group {
-    groupNum: number // must be an interger
+    groupNum: number
     isSplit: boolean // whether the group is split in two
     gender: Gender
 }

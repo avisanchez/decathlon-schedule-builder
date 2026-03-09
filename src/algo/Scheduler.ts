@@ -1,32 +1,36 @@
 import { Activity } from "../activity/types"
 import { Group } from "../group/types"
-import { Coordinate, DaySchedule, WeekSchedule } from "./types"
+import { Constraint, Coordinate, DaySchedule } from "./types"
 import makeMatrix2D from "./utils";
 
-class Scheduler {
-    private NUM_TIME_SLOTS = 5;
+type Schedule = (Activity | null)[][];
 
-    constructor(groups: Group[], activities: Activity[]) {
-        this.groups = groups;
+class Scheduler {
+    private MAX_ITERATIONS = 10000;
+
+    constructor(daySchedule: DaySchedule, activities: Activity[], constraints: Constraint[]) {
+        this.daySchedule = daySchedule;
         this.activities = activities;
+        this.constraints = constraints;
         this.reset();
     }
 
     /**
-     * Set all entries in the day schedule to null
+     * Reset all scheduling variables to their inital values.
      */
     private reset() {
-        this.daySchedule = makeMatrix2D<(Activity | null)>(this.groups.length, this.NUM_TIME_SLOTS, null);
+        this.currSchedule = this.daySchedule.getSchedule();
         this.bestSchedule = [];
-        this.score = 0;
+        this.currScore = 0;
         this.bestScore = -Infinity;
-        this.emptyCells = this.countEmptyCells();
+        this.numCellsToFill = this.countCellsToFill();
         this.iterations = 0;
     }
 
-    public genDaySchedule(): DaySchedule {
+    public genDaySchedule(): (Activity | null)[][] {
         this.reset();
         this._genDaySchedule();
+        console.log("The best schedule found was", this.bestSchedule);
         return this.bestSchedule;
     }
 
@@ -34,15 +38,15 @@ class Scheduler {
      * Get the coordinate of the next cell to fill.
      * 
      * Discussion:
-     * The current implementation simply finds the first empty cell from, starting 
+     * The current implementation simply finds the first empty cell starting 
      * its search from top left to bottom right.
      * 
      * @returns The coordinate of the next cell to fill.
      */
     private getNextCell(): Coordinate {
-        for (let i = 0; i < this.daySchedule.length; ++i) {
-            for (let j = 0; j < this.daySchedule[i].length; ++j) {
-                if (this.daySchedule[i][j] == null) {
+        for (let i = 0; i < this.currSchedule.length; ++i) {
+            for (let j = 0; j < this.currSchedule[i].length; ++j) {
+                if (this.currSchedule[i][j] == null) {
                     return { row: i, col: j };
                 }
             }
@@ -52,17 +56,24 @@ class Scheduler {
     }
 
     /**
-     * Get the available activities for a given group at a given time (i.e. cell). An activity is considered available if it has not been used by the current group, and is not currently being used by another group.
+     * Get the valid activities for a given group at a given time (i.e. cell). An activity is considered valid if it has not been used by the current group, and is not currently being used by another group.
      * @param cell The cell for which to retrieve the available activities.
      * @returns An array of available activities.
      */
-    private getAvailableActivities(cell: Coordinate): Activity[] {
+    private getValidActivities(cell: Coordinate): Activity[] {
+        const mandatoryActivity = this.daySchedule.slots[cell.col].mandatoryActivity;
+        if (mandatoryActivity !== undefined) {
+            return [mandatoryActivity];
+        }
         // activities used by this group (aka row)
-        const rowActivities: Set<Activity | null> = new Set(this.daySchedule[cell.row]);
+        const rowActivities: Set<Activity | null> = new Set(this.currSchedule[cell.row]);
         // activities used by other groups in this "timeslot" (aka column)
-        const colActivities: Set<Activity | null> = new Set(this.daySchedule.map(row => { return row[cell.col] }))
+        const colActivities: Set<Activity | null> = new Set(this.currSchedule.map(row => { return row[cell.col] }));
         return this.activities.filter(activity => {
-            return !rowActivities.has(activity) && !colActivities.has(activity);
+            return !rowActivities.has(activity) &&
+                !colActivities.has(activity) &&
+                activity.special === false
+                && this.constraints.every(c => c.isValid(this.daySchedule.getGroup(cell.row)!, activity));
         });
     }
 
@@ -70,16 +81,16 @@ class Scheduler {
      * Get the number of null cells in the current day schedule.
      * @returns The number of null cells in daySchedule.
      */
-    private countEmptyCells(): number {
-        let numEmptyCells: number = 0;
-        this.daySchedule.forEach(row => {
+    private countCellsToFill(): number {
+        let numCellsToFill: number = 0;
+        this.currSchedule.forEach(row => {
             row.forEach(activity => {
                 if (activity == null) {
-                    numEmptyCells += 1;
+                    numCellsToFill += 1;
                 }
             })
         });
-        return numEmptyCells;
+        return numCellsToFill;
     }
 
     /**
@@ -93,13 +104,22 @@ class Scheduler {
         if (this.bestScore == -Infinity) {
             return true;
         }
-        return this.emptyCells > Math.abs(this.bestScore - this.score);
+        return this.numCellsToFill > Math.abs(this.bestScore - this.currScore);
     }
 
+    /**
+     * Recursivley find the best schedule.
+     * 
+     *  
+     * 
+     * @link To learn more about dynamic programming see: https://ajzhou.gitlab.io/eecs281/notes/chapter23/
+     * 
+     * @description The 
+     */
     private _genDaySchedule(): void {
         this.iterations++;
 
-        if (this.iterations > 10000) {
+        if (this.iterations > this.MAX_ITERATIONS) {
             console.error(`${this._genDaySchedule.name} reached the maximum number of iterations.`)
             return;
         }
@@ -108,51 +128,57 @@ class Scheduler {
             return;
         }
 
-        if (this.emptyCells == 0) {
+        if (this.numCellsToFill == 0) {
             // start debug
             console.log("=====");
-            if (this.score < this.bestScore) {
+            if (this.currScore < this.bestScore) {
                 console.error("There is an issue with pruning. We achieved a schedule with a lower score than the previous best score.");
                 return;
             } else {
                 console.log("Found a valid schedule!");
                 console.log("Previous best score:", this.bestScore);
-                console.log("Current best score:", this.score);
-                console.log(this.daySchedule);
+                console.log("Current best score:", this.currScore);
+                console.log(this.currSchedule);
             }
             console.log("=====");
             // end debug
 
-            this.bestScore = this.score;
-            this.bestSchedule = [...this.daySchedule]
+            this.bestScore = this.currScore;
+            this.bestSchedule = structuredClone(this.currSchedule);
             return;
         }
 
         const cell = this.getNextCell();
-        const availableActivities = this.getAvailableActivities(cell);
+        const availableActivities = this.getValidActivities(cell);
 
         availableActivities.forEach(activity => {
-            /** @todo check that activity is valid */
-            this.daySchedule[cell.row][cell.col] = activity;
-            this.emptyCells--;
-            this.score++;
+            // set activity
+            this.currSchedule[cell.row][cell.col] = activity;
+            this.numCellsToFill--;
+            this.currScore++;
+
             this._genDaySchedule();
-            this.daySchedule[cell.row][cell.col] = null;
-            this.emptyCells++;
-            this.score--;
-        })
+
+            // unset activity
+            this.currSchedule[cell.row][cell.col] = null;
+            this.numCellsToFill++;
+            this.currScore--;
+        });
     }
 
-    private groups: Group[];
-    private activities: Activity[];
+    /** A list of available activities to choose from, initalized once */
+    private activities: Activity[] = [];
+    private daySchedule: DaySchedule;
+    private constraints: Constraint[];
 
-    private daySchedule: DaySchedule = [];
-    private score: number = 0;
+    /** Algorithm vars  */
+    private currScore: number = 0;
     private bestScore: number = 0;
-    private emptyCells: number = 0;
+    private numCellsToFill: number = 0;
     private iterations: number = 0;
 
-    private bestSchedule: DaySchedule = [];
+    private currSchedule: Schedule = [];
+    private bestSchedule: Schedule = [];
 }
 
 export default Scheduler;
