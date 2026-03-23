@@ -65,15 +65,12 @@ class Scheduler {
         if (mandatoryActivity !== undefined) {
             return [mandatoryActivity];
         }
-        // activities used by this group (aka row)
-        const rowActivities: Set<Activity | null> = new Set(this.currSchedule[cell.row]);
-        // activities used by other groups in this "timeslot" (aka column)
-        const colActivities: Set<Activity | null> = new Set(this.currSchedule.map(row => { return row[cell.col] }));
+
+        const row = this.currSchedule[cell.row];
+        const col = this.currSchedule.map(row => { return row[cell.col] });
+
         return this.activities.filter(activity => {
-            return !rowActivities.has(activity) &&
-                !colActivities.has(activity) &&
-                activity.special === false
-                && this.constraints.every(c => c.isValid(this.daySchedule.getGroup(cell.row)!, activity));
+            return this.constraints.every(c => c.isValid(this.daySchedule.getGroup(cell.row)!, activity, row, col));
         });
     }
 
@@ -149,7 +146,16 @@ class Scheduler {
         }
 
         const cell = this.getNextCell();
-        const availableActivities = this.getValidActivities(cell);
+        let availableActivities = this.getValidActivities(cell);
+        availableActivities = availableActivities.sort((a, b) => {
+            if (a.multigroup === true && b.multigroup === true) {
+                return 0;
+            } else if (a.multigroup === true && b.multigroup === false) {
+                return -1;
+            } else {
+                return 1;
+            }
+        })
 
         availableActivities.forEach(activity => {
             // set activity

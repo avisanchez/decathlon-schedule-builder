@@ -7,11 +7,12 @@ import ActivityList from "./activity/ActivityList";
 import DayMasterSchedule from "./schedule/DayMasterSchedule";
 import { DaySchedule } from "./algo/types";
 import { useState } from "react";
+import { exportDayScheduleToWorkbook } from "./utils/export";
 
 function App() {
   let groups: Group[] = [];
   for (let i = 1; i <= 16; ++i) {
-    groups.push({ groupNum: i, isSplit: new Set([0]).has(i), gender: Gender.MALE });
+    groups.push({ groupNum: i, isSplit: new Set([-1]).has(i), gender: Gender.MALE });
   }
 
   let [daySchedule, setDaySchedule] = useState<DaySchedule>(new DaySchedule(groups, [
@@ -27,15 +28,22 @@ function App() {
   ]));
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/GroupCard" element={<GroupCard group={{ groupNum: 5, isSplit: false, gender: Gender.MALE }} />} />
-        <Route path="/GroupForm" element={<GroupForm onSubmit={(numGroups: number) => { console.log(numGroups) }} />} />
-        <Route path="/GroupSettings" element={<GroupSettings />} />
-        <Route path="/ActivityList" element={<ActivityList />} />
-        <Route path="/DayMasterSchedule" element={<DayMasterSchedule daySchedule={daySchedule} />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/GroupCard" element={<GroupCard group={{ groupNum: 5, isSplit: false, gender: Gender.MALE }} />} />
+          <Route path="/GroupForm" element={<GroupForm onSubmit={(numGroups: number) => { console.log(numGroups) }} />} />
+          <Route path="/GroupSettings" element={<GroupSettings />} />
+          <Route path="/ActivityList" element={<ActivityList />} />
+          <Route path="/DayMasterSchedule" element={<DayMasterSchedule title={"Friday"} daySchedule={daySchedule} />} />
+        </Routes>
+      </BrowserRouter>
+      <button onClick={() => {
+        exportDayScheduleToWorkbook();
+      }}>
+        Export
+      </button>
+    </>
   );
 }
 

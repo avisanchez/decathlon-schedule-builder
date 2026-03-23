@@ -23,7 +23,7 @@ ST*
 T&C
 TH
 TTHOF*
-TUG
+TUG*
 VB
 WALL
 WB1

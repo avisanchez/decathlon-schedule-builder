@@ -8,6 +8,13 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "fs:default"
+    "fs:write-files",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "**/*"
+      ]
+    },
+    "dialog:default"
   ]
 }

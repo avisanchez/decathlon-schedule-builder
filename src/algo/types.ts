@@ -1,3 +1,4 @@
+import { act } from "react";
 import { Activity } from "../activity/types"
 import assert from "../assert";
 import { Group } from "../group/types"
@@ -40,6 +41,10 @@ export class DaySchedule {
         return "ERROR";
     }
 
+    public getGroups(): Group[] {
+        return this._groups;
+    }
+
     public getGroupNames(): string[] {
         let groupNames: string[] = [];
         this.groups.forEach(group => {
@@ -79,7 +84,7 @@ export interface Constraint {
      * @param activity
      * @return True if the group is allowed to participate in the given activity, false otherwise.
      */
-    isValid(group: Group, activity: Activity): boolean;
+    isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean; /** @todo add row and column variables */
 }
 
 /**
@@ -97,9 +102,70 @@ export class ExcludeGroupsConstraint implements Constraint {
         this.rule = rule;
     }
 
-    public isValid(group: Group, activity: Activity): boolean {
+    public isValid(group: Group, activity: Activity, row: Activity[], col: Activity[]): boolean {
         return !(this.rule.get(activity.code)?.has(group.groupNum) ?? false);
     }
 
     private rule: Map<string, Set<number>>;
+}
+
+export class MultiGroupActivityConstraint implements Constraint {
+    constructor(rule: Map<string, Set<number>[]>) {
+        this.rule = rule;
+    }
+    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
+        const colSet = new Set(col.map(c => { return c?.code ?? "" }));
+
+        if (!this.rule.has(activity.code) || !colSet.has(activity.code)) {
+            return true;
+        }
+
+        const groupSets: Set<number>[] = this.rule.get(activity.code)!.filter(set => { return set.has(group.groupNum) });
+
+        if (groupSets.length != 1) {
+            console.error(`Expected group to appear exactly once in a set but instead appeared ${groupSets.length} times`);
+            return groupSets.length === 0 ? !colSet.has(activity.code) : false;
+        }
+
+        const groupSet = groupSets[0];
+
+        let isValid = col.filter((a, i) => { return !groupSet.has(i + 1) && activity?.code === a?.code }).length === 0;
+        if (isValid) {
+            groupSet.forEach(groupNum => {
+                if (col[groupNum - 1] !== null && col[groupNum - 1]?.code !== activity.code) { /** @todo this only works for situations without a split group */
+                    isValid = false;
+                }
+            });
+        }
+        return isValid;
+    }
+
+    private rule: Map<string, Set<number>[]>;
+}
+
+// This constraint is bypassed in the case of a multigroup activity
+export class SingleInstanceConstraint implements Constraint {
+    constructor() {
+
+    }
+
+    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
+        const rowSet = new Set(row);
+        const colSet = new Set(col);
+
+        if (rowSet.has(activity)) {
+            return false;
+        }
+        return activity.multigroup === true || !colSet.has(activity);
+    }
+}
+
+export class SpecialActivityConstraint implements Constraint {
+    constructor() {
+
+    }
+
+    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
+        return activity.special === false;
+    }
 }
