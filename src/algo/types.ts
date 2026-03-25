@@ -1,48 +1,66 @@
-import { act } from "react";
 import { Activity } from "../activity/types"
-import assert from "../assert";
 import { Group } from "../group/types"
-import makeMatrix2D from "./utils";
+import { checkDimensions, makeMatrix2D } from "./utils";
 
 export type TimeSlot = { time: string, mandatoryActivity?: Activity }
+export type Schedule = (string | null)[][]
 
+/**
+ * Encapsulates important information about the master schedule for a given day, 
+ * such as groups, time slots, and a matrix of activities.
+ * Provides an interface to quickly query schedule.
+ */
 export class DaySchedule {
     constructor(groups: Group[], slots: TimeSlot[]) {
-        this.groups = groups;
-        this.slots = slots;
+        this.timeSlots = slots;
 
-        this._groups = [];
+        this.groups = [];
         groups.forEach(group => {
-            this._groups.push(group);
+            this.groups.push(group);
             if (group.isSplit) {
-                this._groups.push({ ...group, groupNum: group.groupNum + 0.5 })
+                this.groups.push({ ...group, groupNum: group.groupNum + 0.5 });
             }
         })
-        this.schedule = makeMatrix2D(this._groups.length, this.slots.length, null);
+        this.schedule = makeMatrix2D<string | null>(this.groups.length, this.timeSlots.length, null);
     }
 
-    public getSchedule(): (Activity | null)[][] {
+    public getSchedule(): Schedule {
         return this.schedule;
     }
 
-    public setSchedule(schedule: (Activity | null)[][]) {
-        /**@todo this is unsafe: ensure dimensions match */
-        this.schedule = schedule;
-    }
-
-    public clearSchedule(): void {
-        this.schedule = makeMatrix2D(this._groups.length, this.slots.length, null);
-    }
-
-    public groupName(forRow: number): string {
-        if (0 <= forRow && forRow < this._groups.length) {
-            return `Group ${this._groups[forRow].groupNum}`;
+    public setSchedule(newSchedule: Schedule) {
+        if (checkDimensions(this.schedule, newSchedule)) {
+            this.schedule = newSchedule;
         }
-        return "ERROR";
+    }
+
+    /**
+     * Apply a batch update of a set of cells in the current schedule.
+     * @param updates A set of updates specified by the cell and its new value.
+     */
+    public updateSchedule(updates: Set<{ cell: Coordinate, newValue: string }>) {
+        updates.forEach(update => {
+            if (update.cell.row < 0 ||
+                update.cell.row > this.schedule.length ||
+                update.cell.col < 0 ||
+                update.cell.col > this.schedule[update.cell.row].length) {
+                throw new Error(`Attempint to update (${update.cell.row},${update.cell.col}) which is invalid.`);
+            }
+            this.schedule[update.cell.row][update.cell.col] = update.newValue === "" ? null : update.newValue;
+        });
+    }
+
+    // Set all the entries of the current schedule to null
+    public clearSchedule(): void {
+        this.schedule = makeMatrix2D(this.groups.length, this.timeSlots.length, null);
     }
 
     public getGroups(): Group[] {
-        return this._groups;
+        return this.groups;
+    }
+
+    public getGroup(row: number): (Group | undefined) {
+        return this.groups[row];
     }
 
     public getGroupNames(): string[] {
@@ -58,14 +76,30 @@ export class DaySchedule {
         return groupNames;
     }
 
-    public getGroup(row: number): (Group | undefined) {
-        return this._groups[row];
+    /**
+     * Get the name of the group at a given row in the day schedule. 
+     * The function throws an error if there is no group at the specified row.
+     * 
+     * @param row The row in the schedule corresponding to the given group.
+     * @returns A string repre
+     */
+    public getGroupName(row: number): string {
+        if (0 <= row && row < this.groups.length) {
+            return `Group ${this.groups[row].groupNum}`;
+        }
+
+        const errorMessage: string = `Error in getGroupName(...): No group exists at row ${row}`;
+        alert(errorMessage);
+        throw new Error(errorMessage);
     }
 
-    public groups: Group[];
-    public slots: TimeSlot[];
-    private _groups: Group[];
-    private schedule: (Activity | null)[][];
+    public getTimeSlots(): TimeSlot[] {
+        return this.timeSlots;
+    }
+
+    private timeSlots: TimeSlot[];
+    private groups: Group[];
+    private schedule: Schedule;
 }
 
 /**

@@ -1,9 +1,7 @@
 import { Activity } from "../activity/types"
 import { Group } from "../group/types"
-import { Constraint, Coordinate, DaySchedule } from "./types"
-import makeMatrix2D from "./utils";
-
-type Schedule = (Activity | null)[][];
+import { Constraint, Coordinate, DaySchedule, Schedule } from "./types"
+import { makeMatrix2D } from "./utils";
 
 class Scheduler {
     private MAX_ITERATIONS = 10000;
@@ -27,7 +25,7 @@ class Scheduler {
         this.iterations = 0;
     }
 
-    public genDaySchedule(): (Activity | null)[][] {
+    public genDaySchedule(): Schedule {
         this.reset();
         this._genDaySchedule();
         console.log("The best schedule found was", this.bestSchedule);
@@ -61,7 +59,7 @@ class Scheduler {
      * @returns An array of available activities.
      */
     private getValidActivities(cell: Coordinate): Activity[] {
-        const mandatoryActivity = this.daySchedule.slots[cell.col].mandatoryActivity;
+        const mandatoryActivity = this.daySchedule.getTimeSlots()[cell.col].mandatoryActivity;
         if (mandatoryActivity !== undefined) {
             return [mandatoryActivity];
         }

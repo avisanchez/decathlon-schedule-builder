@@ -1,0 +1,35 @@
+table {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+table,
+th,
+td {
+    border-collapse: collapse;
+    border: 1px solid black;
+}
+
+td {
+    padding: 5px;
+}
+
+.selected {
+    background-color: rgba(95, 158, 160, 0.4);
+}
+
+.rowHeaderSelected,
+.colHeaderSelected {
+    background-color: rgba(128, 128, 128, 0.548);
+}
+
+.editing {
+    background-color: inherit;
+    outline: 2px solid cadetblue;
+    outline-offset: -2px;
+}
+
+input:focus {
+    outline: none;
+}
