@@ -34,7 +34,7 @@ export async function exportDayScheduleToWorkbook(weekSchedule: DaySchedule[]): 
         // let colIndex = 0;
 
         for (let timeSlotIndex = 0; timeSlotIndex < weekSchedule[0].getTimeSlots().length; ++timeSlotIndex) {
-            let rowValues: string[] = [weekSchedule[0].getTimeSlots()[timeSlotIndex].time];
+            let rowValues: string[] = [weekSchedule[0].getTimeSlots()[timeSlotIndex]];
 
             for (let dayIndex = 0; dayIndex < weekSchedule.length; ++dayIndex) {
                 rowValues.push(weekSchedule[dayIndex].getSchedule()[groupIndex][timeSlotIndex] ?? "<NULL>");

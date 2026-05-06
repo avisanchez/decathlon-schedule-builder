@@ -25,5 +25,16 @@
     "active": true,
     "targets": "all",
     "icon": []
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIxQTkwOTE5NDVENEQyOEEKUldTSzB0UkZHUW1wc1lCS2kzZ0N0T1hXWEM4MEYzd0lRR0F3c1QwMGNqRWNRdUx4aWlwaldDZzMK",
+      "endpoints": [
+        "https://github.com/avisanchez/decathlon-schedule-builder/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

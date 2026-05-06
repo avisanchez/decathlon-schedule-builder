@@ -282,9 +282,9 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
             </table>
 
             {/* DEBUG */}
-            <button onClick={() => { console.log(daySchedule.getSchedule()) }}>
+            {/* <button onClick={() => { console.log(daySchedule.getSchedule()) }}>
                 print schedule
-            </button>
+            </button> */}
         </>
     )
 }

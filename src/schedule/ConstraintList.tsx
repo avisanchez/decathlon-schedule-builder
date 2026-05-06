@@ -49,88 +49,96 @@ function ConstraintList() {
     }
 
     return (
-        <ul
-            ref={listRef}
-            onClick={() => setFocusIndex(null)}
+        <div
             style={{
-                width: "fit-content",
-                paddingLeft: "10px"
+                padding: "10px"
             }}
         >
-            {constraints.map((constraint, i) => {
-                return (
-                    <div
-                        onClick={(e) => {
-                            setFocusIndex(i);
-                            e.stopPropagation();
-                        }}
-                        style={{
-                            display: "flex",
-                            alignItems: "center"
-                        }}
-                    >
-                        <div
-                            onMouseOver={() => {
-                                setHoverIndex(i);
-                            }}
-                        >
-                            {
-                                hoverIndex === i ?
-                                    <div
-                                        onMouseLeave={() => {
-                                            setHoverIndex(null);
-                                        }}
-                                    >
-                                        <button
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                const proceed = await confirm("Deleting this constraint cannot be undone. Are you sure you want to proceed?");
-                                                if (!proceed) {
-                                                    return;
-                                                }
-                                                setFocusIndex(null);
-                                                setHoverIndex(null);
-                                                setConstraints((prev) => {
-                                                    return prev.filter((_, j) => {
-                                                        return i !== j;
-                                                    })
-                                                })
-                                            }}
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                    :
-                                    <div style={{
-                                        width: "10px",
-                                        height: "10px",
-                                        aspectRatio: "1",
-                                        borderRadius: "999px",
-                                        background: `color-mix(in srgb, ${isValid(constraint) ? "green" : "red"}, white 40%)`,
-                                        border: `1px solid color-mix(in srgb, ${isValid(constraint) ? "green" : "red"}, white 60%)`
-                                    }} />
-                            }
-                        </div>
-
-
-                        <ConstraintListItem focused={focusIndex === i} constraint={constraint} onChange={(updatedConstraint) => {
-                            setConstraints(prev => {
-                                let updatedConstraints = [...prev];
-                                updatedConstraints[i] = updatedConstraint;
-                                return updatedConstraints;
-                            });
-                        }} />
-                    </div>
-                )
-            })}
             <button
                 onClick={() =>
-                    setConstraints(prev => [...prev, { type: "empty" }])
+                    setConstraints(prev => [{ type: "empty" }, ...prev])
                 }
             >
                 Add Constraint
             </button>
-        </ul >
+            <ul
+                ref={listRef}
+                onClick={() => setFocusIndex(null)}
+                style={{
+                    width: "fit-content",
+                    paddingLeft: "10px",
+                    marginTop: "5px"
+                }}
+            >
+                {constraints.map((constraint, i) => {
+                    return (
+                        <div
+                            onClick={(e) => {
+                                setFocusIndex(i);
+                                e.stopPropagation();
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center"
+                            }}
+                        >
+                            <div
+                                onMouseOver={() => {
+                                    setFocusIndex(null);
+                                    setHoverIndex(i);
+                                }}
+                            >
+                                {
+                                    hoverIndex === i ?
+                                        <div
+                                            onMouseLeave={() => {
+                                                setHoverIndex(null);
+                                            }}
+                                        >
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    const proceed = await confirm("Deleting this constraint cannot be undone. Are you sure you want to proceed?");
+                                                    if (!proceed) {
+                                                        return;
+                                                    }
+                                                    setFocusIndex(null);
+                                                    setHoverIndex(null);
+                                                    setConstraints((prev) => {
+                                                        return prev.filter((_, j) => {
+                                                            return i !== j;
+                                                        })
+                                                    })
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                        :
+                                        <div style={{
+                                            width: "10px",
+                                            height: "10px",
+                                            aspectRatio: "1",
+                                            borderRadius: "999px",
+                                            background: `color-mix(in srgb, ${isValid(constraint) ? "green" : "red"}, white 40%)`,
+                                            border: `1px solid color-mix(in srgb, ${isValid(constraint) ? "green" : "red"}, white 60%)`
+                                        }} />
+                                }
+                            </div>
+
+
+                            <ConstraintListItem focused={focusIndex === i} constraint={constraint} onChange={(updatedConstraint) => {
+                                setConstraints(prev => {
+                                    let updatedConstraints = [...prev];
+                                    updatedConstraints[i] = updatedConstraint;
+                                    return updatedConstraints;
+                                });
+                            }} />
+                        </div>
+                    )
+                })}
+            </ul >
+        </div>
     )
 }
 
@@ -454,107 +462,117 @@ function MultiGroupConstraintView({ readOnly, constraint, onChange }: {
         <div style={{
             display: "flex",
             overflow: "scroll",
+            gap: "4px",
+            flexDirection: "column"
         }}>
-            {
-                groupings.map((grouping, i) => {
-                    if (grouping.size === 0) {
-                        return <div />
-                    }
-                    return (
-                        <div>
-                            {
-                                readOnly ?
-                                    <span
+            <div>
+                {
+                    readOnly ?
+                        <span
+                            style={{
+                                fontWeight: "bold"
+                            }}
+                        >
+                            {constraint.activity ?? "{Activity}"}
+                        </span>
+                        :
+                        <select
+                            value={constraint.activity}
+                            onChange={(e) => {
+                                const newActivity = e.target.value === "" ? undefined : e.target.value;
+                                if (onChange) onChange({ ...constraint, activity: newActivity });
+                            }}
+                        >
+                            <option value={""}></option>
+                            {activities.map(activity => {
+                                return (
+                                    <option value={activity.code}>{activity.code}</option>
+                                )
+                            })}
+                        </select>
+                }
+                <span> is multi-group </span>
+            </div>
+            <div
+                style={{
+                    display: "flex"
+                }}
+            >
+                {
+                    groupings.map((grouping, i) => {
+                        if (grouping.size === 0) {
+                            return <div />
+                        }
+                        return (
+                            <div>
+                                <div>
+                                    <h3
                                         style={{
-                                            fontWeight: "bold"
+                                            margin: "0px",
+                                            textAlign: "center"
+                                        }}
+                                        hidden={readOnly}
+                                    >
+                                        {ALPHABET.charAt(i)}
+                                    </h3>
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: `repeat(${grouping.size / 2}, 1fr)`,
+                                            gap: "10px",
+                                            width: "fit-content",
+                                            height: "fit-content",
+                                            whiteSpace: "nowrap",
+                                            background: "rgba(0, 0, 0, 0.03)",
+                                            border: "1px solid rgba(0, 0, 0, 0.12)",
+                                            margin: "5px",
+                                            padding: "10px", borderRadius: "5px",
                                         }}
                                     >
-                                        {constraint.activity ?? "{Activity}"}
-                                    </span>
-                                    :
-                                    <select
-                                        value={constraint.activity}
-                                        onChange={(e) => {
-                                            if (onChange) onChange({ ...constraint, activity: e.target.value });
-                                        }}
-                                    >
-                                        <option value={""}></option>
-                                        {activities.map(activity => {
+                                        {[...grouping].sort((a, b) => { return a - b }).map(group => {
                                             return (
-                                                <option value={activity.code}>{activity.code}</option>
+                                                <div>
+                                                    Group {group}
+                                                    <select
+                                                        hidden={readOnly}
+                                                        value={ALPHABET.charAt(i)}
+                                                        onChange={(e) => {
+                                                            const currMetaGroupIndex = i;
+                                                            const newMetaGroupIndex = ALPHABET.indexOf(e.target.value);
+                                                            if (newMetaGroupIndex < 0) {
+                                                                return console.error("Cannot find grouping");
+                                                            }
+                                                            const newGroupings = [...groupings];
+                                                            if (newGroupings[currMetaGroupIndex].delete(group) === false) {
+                                                                console.log("newGroupings", newGroupings);
+                                                                console.log("currMetaGroupIndex: ", currMetaGroupIndex);
+                                                                return console.error("Group did not exist in expected meta-group");
+                                                            }
+                                                            newGroupings[newMetaGroupIndex].add(group);
+                                                            if (onChange) onChange({ ...constraint, groupings: newGroupings });
+                                                        }}
+                                                    >
+                                                        {
+                                                            ALPHABET.split("").map(letter => {
+                                                                return (
+                                                                    <option value={letter}>
+                                                                        {letter}
+                                                                    </option>
+                                                                )
+                                                            })
+                                                        }
+                                                    </select>
+                                                </div>
                                             )
                                         })}
-                                    </select>
-                            }
-
-                            <span> is multi-group </span>
-                            <div>
-                                <h3
-                                    style={{
-                                        margin: "0px",
-                                        textAlign: "center"
-                                    }}
-                                    hidden={readOnly}
-                                >
-                                    {ALPHABET.charAt(i)}
-                                </h3>
-                                <div
-                                    style={{
-                                        display: "grid",
-                                        gridTemplateColumns: `repeat(${grouping.size / 2}, 1fr)`,
-                                        gap: "10px",
-                                        width: "fit-content",
-                                        height: "fit-content",
-                                        whiteSpace: "nowrap",
-                                        background: "rgba(0, 0, 0, 0.03)",
-                                        border: "1px solid rgba(0, 0, 0, 0.12)",
-                                        margin: "5px",
-                                        padding: "10px", borderRadius: "5px",
-                                    }}
-                                >
-                                    {[...grouping].sort((a, b) => { return a - b }).map(group => {
-                                        return (
-                                            <div>
-                                                Group {group}
-                                                <select
-                                                    hidden={readOnly}
-                                                    value={ALPHABET.charAt(i)}
-                                                    onChange={(e) => {
-                                                        const currMetaGroupIndex = i;
-                                                        const newMetaGroupIndex = ALPHABET.indexOf(e.target.value);
-                                                        if (newMetaGroupIndex < 0) {
-                                                            return console.error("Cannot find grouping");
-                                                        }
-                                                        const newGroupings = [...groupings];
-                                                        if (newGroupings[currMetaGroupIndex].delete(group) === false) {
-                                                            console.log("newGroupings", newGroupings);
-                                                            console.log("currMetaGroupIndex: ", currMetaGroupIndex);
-                                                            return console.error("Group did not exist in expected meta-group");
-                                                        }
-                                                        newGroupings[newMetaGroupIndex].add(group);
-                                                        if (onChange) onChange({ ...constraint, groupings: newGroupings });
-                                                    }}
-                                                >
-                                                    {
-                                                        ALPHABET.split("").map(letter => {
-                                                            return (
-                                                                <option value={letter}>
-                                                                    {letter}
-                                                                </option>
-                                                            )
-                                                        })
-                                                    }
-                                                </select>
-                                            </div>
-                                        )
-                                    })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                    )
-                })
-            }
+                        )
+                    })
+                }
+            </div>
         </div >
     )
 }
@@ -583,7 +601,8 @@ function MandatoryConstraintView({ readOnly, constraint, onChange }: {
                     <select
                         value={constraint.activity}
                         onChange={(e) => {
-                            if (onChange) onChange({ ...constraint, activity: e.target.value });
+                            const newActivity = e.target.value === "" ? undefined : e.target.value;
+                            if (onChange) onChange({ ...constraint, activity: newActivity });
                         }}
                     >
                         <option value={""} />
@@ -610,7 +629,8 @@ function MandatoryConstraintView({ readOnly, constraint, onChange }: {
                     <select
                         value={constraint.time ?? ""}
                         onChange={(e) => {
-                            if (onChange) onChange({ ...constraint, time: e.target.value });
+                            const newTime = e.target.value === "" ? undefined : e.target.value;
+                            if (onChange) onChange({ ...constraint, time: newTime });
                         }}
                     >
                         <option value={""} />

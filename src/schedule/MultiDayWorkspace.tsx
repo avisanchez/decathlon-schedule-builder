@@ -108,7 +108,8 @@ function MultiDayWorkspace() {
 
                 {/* toolbar */}
                 <div style={{
-                    background: "gray",
+                    background: "#36454F",
+                    borderBottom: "1px solid rgb(195, 195, 195)",
                     top: 0,
                     left: 0,
                     width: "100%",
@@ -119,12 +120,24 @@ function MultiDayWorkspace() {
                 }}>
                     {/* Settings button */}
                     <button
-                        onClick={() => {
+                        onClick={async () => {
+                            if (!inSettings) {
+                                const proceed = await confirm("Switching to the settings page will delete all constraints and schedule data.");
+                                if (!proceed) { return; }
+                            }
+                            setConstraints([]);
+                            setWeekSchedule(getEmptyWeekSchedule());
                             setInSettings(prev => !prev);
                         }}
                     >
                         Settings
                     </button>
+
+                    <div
+                        style={{
+                            flex: "0.97"
+                        }}
+                    />
 
                     {/* Clear schedule button */}
                     <button
@@ -138,7 +151,7 @@ function MultiDayWorkspace() {
                         }}
                         disabled={inSettings}
                     >
-                        Clear Schedule
+                        Clear
                     </button>
 
                     {/* Generate button */}
@@ -176,50 +189,65 @@ function MultiDayWorkspace() {
                     />
                 </div>
 
-                {inSettings ?
-                    <div>
-                        <GroupSettings groups={workspace.groups} onChange={(updatedGroups) => setWorkspace(prev => { return { ...prev, groups: updatedGroups } })} />
-                        <ActivitySettings activities={workspace.activities} onChange={(updatedActivities) => setWorkspace(prev => { return { ...prev, activities: updatedActivities } })} />
-                    </div>
-                    :
-                    <div>
-                        {/* Day schedules */}
-                        <div style={{ display: "flex" }}>
-                            {weekSchedule.map((daySchedule, i) => {
-                                return (
-                                    <div key={weekdays[i]} style={{ padding: 10 }}>
 
-                                        <h2 key={`hide-button-${i}`} onClick={() => { console.log("clicked"); setVisibleSchedules(prev => prev.map((v, idx) => idx === i ? !v : v)); }}>
-                                            {
-                                                visibleSchedules[i] ?
-                                                    weekdays[i] :
-                                                    weekdayAbbrs[i]
-                                            }
-                                        </h2>
+                <div hidden={!inSettings}>
+                    <GroupSettings groups={workspace.groups} onChange={(updatedGroups) => setWorkspace(prev => { return { ...prev, groups: updatedGroups } })} />
+                    <ActivitySettings activities={workspace.activities} onChange={(updatedActivities) => setWorkspace(prev => { return { ...prev, activities: updatedActivities } })} />
+                </div>
 
+                <div hidden={inSettings}>
+                    {/* Day schedules */}
+                    <div style={{ display: "flex" }}>
+                        {weekSchedule.map((daySchedule, i) => {
+                            return (
+                                <div key={weekdays[i]} style={{ padding: 10 }}>
+
+                                    <h2 key={`hide-button-${i}`} onClick={() => { console.log("clicked"); setVisibleSchedules(prev => prev.map((v, idx) => idx === i ? !v : v)); }}>
                                         {
-                                            visibleSchedules[i] &&
-                                            <DayMasterSchedule key={`master-schedule-${i}`} daySchedule={daySchedule} setDaySchedule={(newDaySchedule) => {
-                                                setWeekSchedule((prev) => {
-                                                    prev[i] = newDaySchedule;
-                                                    return [...prev];
-                                                });
-                                            }}
-                                                searchterm={searchterm}
-                                            />
+                                            visibleSchedules[i] ?
+                                                weekdays[i] :
+                                                weekdayAbbrs[i]
                                         }
+                                    </h2>
 
-                                    </div>
-                                )
-                            })}
-                        </div>
+                                    {
+                                        visibleSchedules[i] &&
+                                        <DayMasterSchedule key={`master-schedule-${i}`} daySchedule={daySchedule} setDaySchedule={(newDaySchedule) => {
+                                            setWeekSchedule((prev) => {
+                                                prev[i] = newDaySchedule;
+                                                return [...prev];
+                                            });
+                                        }}
+                                            searchterm={searchterm}
+                                        />
+                                    }
 
-                        <div>
-                            <h2>Constraints</h2>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    <div
+                        style={{
+                            position: "fixed",
+                            width: "98.5%",
+                        }}
+                    >
+                        <h2>Constraints</h2>
+                        <div
+                            style={{
+                                overflowX: "scroll",
+                                overflowY: "scroll",
+                                border: "1px solid rgb(0, 0, 0)",
+                                borderRadius: 10,
+                                height: 190
+                            }}
+                        >
                             <ConstraintList />
                         </div>
                     </div>
-                }
+                </div>
+
             </div>
         </WorkspaceContext.Provider>
 
