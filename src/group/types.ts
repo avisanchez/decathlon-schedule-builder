@@ -5,7 +5,7 @@ export enum Gender {
 }
 
 export interface Group {
-    groupNum: number
+    groupNum: number // expected to be a whole number. To specify a group x.5, set isSplit=true
     isSplit: boolean // whether the group is split in two
-    gender: Gender
+    gender?: Gender
 }

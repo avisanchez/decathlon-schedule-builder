@@ -1,3 +1,4 @@
+import { act } from "react";
 import { Activity } from "../activity/types"
 import { Group } from "../group/types"
 import { checkDimensions, makeMatrix2D } from "./utils";
@@ -11,7 +12,7 @@ export type Schedule = (string | null)[][]
  * Provides an interface to quickly query schedule.
  */
 export class DaySchedule {
-    constructor(groups: Group[], slots: TimeSlot[]) {
+    constructor(groups: Group[], slots: string[]) {
         this.timeSlots = slots;
 
         this.groups = [];
@@ -93,11 +94,11 @@ export class DaySchedule {
         throw new Error(errorMessage);
     }
 
-    public getTimeSlots(): TimeSlot[] {
+    public getTimeSlots(): string[] {
         return this.timeSlots;
     }
 
-    private timeSlots: TimeSlot[];
+    private timeSlots: string[];
     private groups: Group[];
     private schedule: Schedule;
 }
@@ -108,21 +109,32 @@ export class DaySchedule {
  */
 export type Coordinate = { row: number, col: number }
 
+export type WeekCoordinate = { day: number, row: number, col: number }
+
 /**
  * Interface for scheduling algorithm constraints
  */
 export interface Constraint {
     /**
      * Determine whether the specified group is allowed to participate in the particular activity.
-     * @param group 
-     * @param activity
+     * @todo write params
      * @return True if the group is allowed to participate in the given activity, false otherwise.
      */
-    isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean; /** @todo add row and column variables */
+    isValid(activity: string, pos: WeekCoordinate, schedule: DaySchedule[]): boolean;
 }
 
 /**
- * A constraint specifying which groups are to be excluded from a given activity.
+ * A group is limited to doing an activity at most once per day.
+ */
+export class SingleInstanceConstraint implements Constraint {
+    public isValid(activity: string, pos: WeekCoordinate, schedule: DaySchedule[]): boolean {
+        const rowSet = new Set(schedule[pos.day].getSchedule()[pos.row]);
+        return !rowSet.has(activity);
+    }
+}
+
+/**
+ * Specify which groups are to be excluded from a given activity.
  */
 export class ExcludeGroupsConstraint implements Constraint {
     /**
@@ -136,8 +148,15 @@ export class ExcludeGroupsConstraint implements Constraint {
         this.rule = rule;
     }
 
-    public isValid(group: Group, activity: Activity, row: Activity[], col: Activity[]): boolean {
-        return !(this.rule.get(activity.code)?.has(group.groupNum) ?? false);
+    public isValid(activity: string, pos: WeekCoordinate, schedule: DaySchedule[]): boolean {
+        const group: Group | undefined = schedule[pos.day].getGroup(pos.row);
+        const excludedGroups = this.rule.get(activity);
+
+        if (group === undefined) {
+            return false;
+        }
+
+        return !(excludedGroups?.has(group.groupNum));
     }
 
     private rule: Map<string, Set<number>>;
@@ -147,59 +166,33 @@ export class MultiGroupActivityConstraint implements Constraint {
     constructor(rule: Map<string, Set<number>[]>) {
         this.rule = rule;
     }
-    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
-        const colSet = new Set(col.map(c => { return c?.code ?? "" }));
+    public isValid(activity: string, pos: WeekCoordinate, schedule: DaySchedule[]): boolean {
+        const group: Group | undefined = schedule[pos.day].getGroup(pos.row);
+        const colSet = new Set(schedule[pos.day].getSchedule().map(row => row[pos.col]));
+        const groupings: Set<number>[] | undefined = this.rule.get(activity);
 
-        if (!this.rule.has(activity.code) || !colSet.has(activity.code)) {
+        if (group === undefined) {
+            return false;
+        } else if (!colSet.has(activity)) { // no one is currently doing the activity, so it is certainly valid
             return true;
+        } else if (groupings === undefined) { // any activity not in our rule map is implicitly single-group-only
+            return false;
         }
 
-        const groupSets: Set<number>[] = this.rule.get(activity.code)!.filter(set => { return set.has(group.groupNum) });
+        const grouping = groupings.find(grouping => grouping.has(group.groupNum));
 
-        if (groupSets.length != 1) {
-            console.error(`Expected group to appear exactly once in a set but instead appeared ${groupSets.length} times`);
-            return groupSets.length === 0 ? !colSet.has(activity.code) : false;
+        if (grouping === undefined) {
+            return false;
         }
 
-        const groupSet = groupSets[0];
-
-        let isValid = col.filter((a, i) => { return !groupSet.has(i + 1) && activity?.code === a?.code }).length === 0;
-        if (isValid) {
-            groupSet.forEach(groupNum => {
-                if (col[groupNum - 1] !== null && col[groupNum - 1]?.code !== activity.code) { /** @todo this only works for situations without a split group */
-                    isValid = false;
-                }
-            });
+        for (let i = 0; i < schedule[pos.day].getSchedule().length; ++i) {
+            // in english: if any group outside our grouping has the specified activity, then it is invalid
+            if (schedule[pos.day].getSchedule()[pos.row][pos.col] === activity && !grouping.has(schedule[pos.day].getGroup(i)?.groupNum ?? -1)) {
+                return false;
+            }
         }
-        return isValid;
+        return true;
     }
 
     private rule: Map<string, Set<number>[]>;
-}
-
-// This constraint is bypassed in the case of a multigroup activity
-export class SingleInstanceConstraint implements Constraint {
-    constructor() {
-
-    }
-
-    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
-        const rowSet = new Set(row);
-        const colSet = new Set(col);
-
-        if (rowSet.has(activity)) {
-            return false;
-        }
-        return activity.multigroup === true || !colSet.has(activity);
-    }
-}
-
-export class SpecialActivityConstraint implements Constraint {
-    constructor() {
-
-    }
-
-    public isValid(group: Group, activity: Activity, row: (Activity | null)[], col: (Activity | null)[]): boolean {
-        return activity.special === false;
-    }
 }

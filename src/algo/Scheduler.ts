@@ -6,18 +6,23 @@ import { makeMatrix2D } from "./utils";
 class Scheduler {
     private MAX_ITERATIONS = 10000;
 
-    constructor(daySchedule: DaySchedule, activities: Activity[], constraints: Constraint[]) {
-        this.daySchedule = daySchedule;
-        this.activities = activities;
+    constructor() {
+        this.daySchedules = [];
+        this.activities = [];
+        this.constraints = [];
+    }
+
+    public init(daySchedules: DaySchedule[], activities: Activity[], constraints: Constraint[]) {
+        this.daySchedules = daySchedules;
+        this.activities = activities.filter(activity => !activity.special);
         this.constraints = constraints;
-        this.reset();
     }
 
     /**
      * Reset all scheduling variables to their inital values.
      */
     private reset() {
-        this.currSchedule = this.daySchedule.getSchedule();
+        this.currSchedule = this.daySchedules.map(daySchedule => daySchedule.getSchedule());
         this.bestSchedule = [];
         this.currScore = 0;
         this.bestScore = -Infinity;
@@ -25,11 +30,14 @@ class Scheduler {
         this.iterations = 0;
     }
 
-    public genDaySchedule(): Schedule {
+    public run(): Schedule[] {
+        if (this.daySchedules.length === 0) {
+            throw new Error("Nothing to be done. It is likely that init() was forgotten.")
+        }
         this.reset();
-        this._genDaySchedule();
-        console.log("The best schedule found was", this.bestSchedule);
-        return this.bestSchedule;
+        this.genDaySchedule();
+        console.log("The best schedule found was", this.bestSchedule[0]);
+        return this.bestSchedule[0];
     }
 
     /**
@@ -41,16 +49,18 @@ class Scheduler {
      * 
      * @returns The coordinate of the next cell to fill.
      */
-    private getNextCell(): Coordinate {
+    private getNextCell(): { cell: Coordinate, scheduleIndex: number } {
         for (let i = 0; i < this.currSchedule.length; ++i) {
             for (let j = 0; j < this.currSchedule[i].length; ++j) {
-                if (this.currSchedule[i][j] == null) {
-                    return { row: i, col: j };
+                for (let k = 0; k < this.currSchedule[i][j].length; ++k) {
+                    if (this.currSchedule[i][j][k] === null) {
+                        return { cell: { row: j, col: k }, scheduleIndex: i }
+                    }
                 }
             }
         }
         console.error(`${this.getNextCell.name} was called when there were no empty cells.`)
-        return { row: -1, col: -1 };
+        return { cell: { row: -1, col: -1 }, scheduleIndex: -1 };
     }
 
     /**
@@ -59,16 +69,8 @@ class Scheduler {
      * @returns An array of available activities.
      */
     private getValidActivities(cell: Coordinate): Activity[] {
-        const mandatoryActivity = this.daySchedule.getTimeSlots()[cell.col].mandatoryActivity;
-        if (mandatoryActivity !== undefined) {
-            return [mandatoryActivity];
-        }
-
-        const row = this.currSchedule[cell.row];
-        const col = this.currSchedule.map(row => { return row[cell.col] });
-
         return this.activities.filter(activity => {
-            return this.constraints.every(c => c.isValid(this.daySchedule.getGroup(cell.row)!, activity, row, col));
+            return this.constraints.every(c => c.isValid(activity.code, { day: this.currScheduleIndex, row: cell.row, col: cell.col }, this.daySchedules));
         });
     }
 
@@ -78,13 +80,15 @@ class Scheduler {
      */
     private countCellsToFill(): number {
         let numCellsToFill: number = 0;
-        this.currSchedule.forEach(row => {
-            row.forEach(activity => {
-                if (activity == null) {
-                    numCellsToFill += 1;
+        for (let i = 0; i < this.currSchedule.length; ++i) {
+            for (let j = 0; j < this.currSchedule[i].length; ++j) {
+                for (let k = 0; k < this.currSchedule[i][j].length; ++k) {
+                    if (this.currSchedule[i][j][k] === null) {
+                        numCellsToFill += 1;
+                    }
                 }
-            })
-        });
+            }
+        }
         return numCellsToFill;
     }
 
@@ -111,11 +115,11 @@ class Scheduler {
      * 
      * @description The 
      */
-    private _genDaySchedule(): void {
+    private genDaySchedule(): void {
         this.iterations++;
 
         if (this.iterations > this.MAX_ITERATIONS) {
-            console.error(`${this._genDaySchedule.name} reached the maximum number of iterations.`)
+            console.error(`${this.genDaySchedule.name} reached the maximum number of iterations.`)
             return;
         }
 
@@ -133,17 +137,21 @@ class Scheduler {
                 console.log("Found a valid schedule!");
                 console.log("Previous best score:", this.bestScore);
                 console.log("Current best score:", this.currScore);
-                console.log(this.currSchedule);
+                console.log(this.currSchedule[this.currScheduleIndex]);
             }
             console.log("=====");
             // end debug
 
             this.bestScore = this.currScore;
-            this.bestSchedule = structuredClone(this.currSchedule);
+            this.bestSchedule.push(structuredClone(this.currSchedule));
             return;
         }
 
-        const cell = this.getNextCell();
+        const nextCell = this.getNextCell();
+        // this is jank, change later
+        const cell = nextCell.cell;
+        this.currScheduleIndex = nextCell.scheduleIndex;
+
         let availableActivities = this.getValidActivities(cell);
         availableActivities = availableActivities.sort((a, b) => {
             if (a.multigroup === true && b.multigroup === true) {
@@ -157,22 +165,22 @@ class Scheduler {
 
         availableActivities.forEach(activity => {
             // set activity
-            this.currSchedule[cell.row][cell.col] = activity;
+            this.currSchedule[this.currScheduleIndex][cell.row][cell.col] = activity.code;
             this.numCellsToFill--;
             this.currScore++;
 
-            this._genDaySchedule();
+            this.genDaySchedule();
 
             // unset activity
-            this.currSchedule[cell.row][cell.col] = null;
+            this.currSchedule[this.currScheduleIndex][cell.row][cell.col] = null;
             this.numCellsToFill++;
             this.currScore--;
         });
     }
 
-    /** A list of available activities to choose from, initalized once */
+    // A list of available activities to choose from, initalized once
     private activities: Activity[] = [];
-    private daySchedule: DaySchedule;
+    private daySchedules: DaySchedule[];
     private constraints: Constraint[];
 
     /** Algorithm vars  */
@@ -181,8 +189,9 @@ class Scheduler {
     private numCellsToFill: number = 0;
     private iterations: number = 0;
 
-    private currSchedule: Schedule = [];
-    private bestSchedule: Schedule = [];
+    private currScheduleIndex: number = -1;
+    private currSchedule: Schedule[] = [];
+    private bestSchedule: Schedule[][] = [];
 }
 
 export default Scheduler;

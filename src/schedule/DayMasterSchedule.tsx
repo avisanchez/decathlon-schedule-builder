@@ -1,22 +1,38 @@
-import { Coordinate, DaySchedule, MultiGroupActivityConstraint, SingleInstanceConstraint, SpecialActivityConstraint, TimeSlot } from "../algo/types";
-import getActivities from "../activity/utils";
-import { ExcludeGroupsConstraint } from "../algo/types";
-import Scheduler from "../algo/Scheduler";
-import { ChangeEvent, KeyboardEventHandler, useEffect, useRef, useState } from "react";
-import { exportDayScheduleToWorkbook } from "../utils/export";
-import { useId } from "react";
+import {
+    Coordinate,
+    DaySchedule,
+    Schedule,
+    TimeSlot
+} from "../algo/types";
+import {
+    ChangeEvent,
+    useEffect,
+    useRef,
+    useState,
+    useId
+} from "react";
 import styles from "./DayMasterSchedule.module.css";
 
-function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule, readOnly?: boolean }) {
+type TableCell = {
+    cell: Coordinate
+    editable: boolean
+    content: string | null
+}
 
-    const uniqueId: string = useId();
+function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }: {
+    daySchedule: DaySchedule,
+    setDaySchedule: (daySchedule: DaySchedule) => void,
+    readOnly?: boolean,
+    searchterm?: string
+}) {
+    const uniqueId: string = useId(); // for key generation
 
-    const [schedule, setSchedule] = useState<string[][]>(daySchedule.getSchedule().map(row => { return row.map(entry => { return entry ?? "" }) }));
-
-    const [selectedCell, setSelectedCell] = useState<{ cell: Coordinate, editable: boolean, content: string } | null>(null);
+    const [anchorCell, setAnchorCell] = useState<TableCell | null>(null);
+    const [selectedCells, setSelectedCells] = useState<Set<Coordinate>>(new Set());
 
     // vars for rendering
-    const timeSlots: TimeSlot[] = daySchedule.getTimeSlots();
+    const timeSlots: string[] = daySchedule.getTimeSlots();
+    const schedule: Schedule = daySchedule.getSchedule();
 
     // ---------------------
     //         refs
@@ -26,9 +42,11 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
     // ---------------------
     //        effects
     // ---------------------
+
+    // debug the selected cell
     useEffect(() => {
-        console.log(`\n\tselectedCell.cell: (${selectedCell?.cell.row},${selectedCell?.cell.col})\n\tselectedCell.content: ${selectedCell?.content}\n\tselectedCell.editable: ${selectedCell?.editable}`)
-    }, [selectedCell]);
+        console.log(`\n\tselectedCell.cell: (${anchorCell?.cell.row},${anchorCell?.cell.col})\n\tselectedCell.content: ${anchorCell?.content}\n\tselectedCell.editable: ${anchorCell?.editable}`)
+    }, [anchorCell]);
 
     /**
      * This effect is necessary to fix a visual bug where, when a table cell transitioned to the editing state,
@@ -37,40 +55,71 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
      * Solution is credit to ChatGPT.
      */
     useEffect(() => {
-        if (selectedCell?.editable === true) {
+        if (anchorCell?.editable === true) {
             requestAnimationFrame(() => { // animation frame synchronizes focus and redraw 
                 inputRef.current?.focus();
             });
         }
-    }, [selectedCell?.editable]);
+    }, [anchorCell?.editable]);
+
+    // synchronize 
+    useEffect(() => {
+        if (!anchorCell) {
+            return;
+        }
+        if (anchorCell.content !== schedule[anchorCell.cell.row][anchorCell.cell.col]) {
+            setDaySchedule(daySchedule);
+        }
+    }, [anchorCell?.content]);
+
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key !== "Delete" && e.key !== "Backspace") return;
+
+            // Ignore if user is editing
+            if (document.activeElement instanceof HTMLInputElement) return;
+
+            if (!anchorCell) return;
+
+            setAnchorCell({ ...anchorCell, content: null })
+        }
+
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [anchorCell?.cell]); // important dependency
 
     // ------------------------------
     //        helper functions
     // ------------------------------
     // commit the changes of the selected cell
     function commitChanges(): void {
-        if (selectedCell !== null) {
-            schedule[selectedCell.cell.row][selectedCell.cell.col] = selectedCell.content ?? "";
-            setSchedule(schedule);
-            // daySchedule.setSchedule(schedule);
+        if (anchorCell !== null) {
+            daySchedule.getSchedule()[anchorCell.cell.row][anchorCell.cell.col] = anchorCell.content;
+            setDaySchedule(daySchedule);
         }
     }
 
     // return whether a given cell is selected
     function isSelected(cell: Coordinate): boolean {
-        return selectedCell?.cell.row === cell.row && selectedCell?.cell.col === cell.col;
+        if (selectedCells.has(cell)) {
+            return true;
+        }
+        return anchorCell?.cell.row === cell.row && anchorCell?.cell.col === cell.col;
     }
 
     function isRowSelected(row: number): boolean {
-        return selectedCell?.cell.row === row;
+        return anchorCell?.cell.row === row;
     }
 
     function isColSelected(col: number): boolean {
-        return selectedCell?.cell.col === col;
+        return anchorCell?.cell.col === col;
     }
 
     function isEditing(cell: Coordinate): boolean {
-        return isSelected(cell) && selectedCell?.editable === true;
+        return isSelected(cell) && anchorCell?.editable === true;
     }
 
     // ------------------------------
@@ -78,7 +127,7 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
     // ------------------------------
 
     // manage inner table cell (<td>) getting clicked
-    function onClickTd(row: number, col: number, content: string): void {
+    function onClickTd(row: number, col: number, content: string | null): void {
         if (readOnly === true) {
             return;
         }
@@ -88,7 +137,7 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
         commitChanges();
         const newSelectedCell: Coordinate = { row: row, col: col };
         const isSameCell = isSelected(newSelectedCell);
-        setSelectedCell({ cell: newSelectedCell, editable: isSameCell, content: content });
+        setAnchorCell({ cell: newSelectedCell, editable: isSameCell, content: content === "" ? null : content });
     }
 
     function onClickInput(row: number, col: number): void {
@@ -98,16 +147,12 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
     }
 
     function onChange(e: ChangeEvent<HTMLInputElement, HTMLInputElement>): void {
-        if (selectedCell === null || selectedCell === undefined) {
+        if (anchorCell === null || anchorCell === undefined) {
             const errorMessage: string = "User is editing a cell when there are none selected.";
             alert(errorMessage)
             throw new Error(errorMessage)
         }
-        setSelectedCell({ ...selectedCell, content: e.target.value });
-    }
-
-    function handleKeyDown(e: KeyboardEventHandler<HTMLTableElement>): void {
-
+        setAnchorCell({ ...anchorCell, content: e.target.value });
     }
 
     return (
@@ -124,6 +169,7 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
             <table
                 key={uniqueId}
                 className={styles.root}
+                tabIndex={0}
             >
                 <thead>
                     <tr key={`${uniqueId}-col-headers`}>
@@ -142,8 +188,12 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
                                             styles.colHeaderSelected :
                                             undefined
                                     }
+                                    onClick={() => {
+                                        console.log("Clicked table header");
+                                        setSelectedCells(new Set([{ row: 0, col: i }]));
+                                    }}
                                 >
-                                    {slot.time}
+                                    {slot}
                                 </th>
                             )
                         })}
@@ -155,16 +205,18 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
                         return (
                             <tr key={`${uniqueId}-row-${i}`}>
 
-                                {/* ---------------------------
-                                  *          Row Header
-                                  * --------------------------- 
-                                  */}
+                                {
+                                    // ---------------------------
+                                    //          Row Header
+                                    // --------------------------- 
+                                }
                                 <td key={`${uniqueId}-row-header-${i}`}
                                     className={
                                         isRowSelected(i) ?
                                             styles.rowHeaderSelected :
                                             undefined
                                     }
+                                    style={{ whiteSpace: "nowrap" }}
                                 >
                                     {daySchedule.getGroupName(i)}
                                 </td>
@@ -186,13 +238,17 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
                                                             styles.selected :
                                                             undefined
                                                 }
+                                                style={searchterm && searchterm === activity
+                                                    ? { background: "yellow" }
+                                                    : undefined
+                                                }
                                             >
-                                                {isSelected({ row: i, col: j }) ? (
+                                                {anchorCell && isSelected({ row: i, col: j }) ? (
                                                     <>
                                                         <input
                                                             ref={inputRef}
                                                             type="text"
-                                                            value={selectedCell?.content ?? "<ERROR>"}
+                                                            value={anchorCell.content ?? ""}
                                                             onChange={onChange}
                                                             readOnly={!isEditing({ row: i, col: j })}
                                                             list="browsers"
@@ -212,7 +268,7 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
 
                                                 ) : (
                                                     <div style={{ minWidth: 55 }}>
-                                                        {activity}
+                                                        {activity ?? ""}
                                                     </div>
                                                 )}
                                             </td>
@@ -224,6 +280,11 @@ function DayMasterSchedule({ daySchedule, readOnly }: { daySchedule: DaySchedule
                     })}
                 </tbody>
             </table>
+
+            {/* DEBUG */}
+            <button onClick={() => { console.log(daySchedule.getSchedule()) }}>
+                print schedule
+            </button>
         </>
     )
 }

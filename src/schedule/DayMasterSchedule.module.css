@@ -21,7 +21,7 @@ td {
 
 .rowHeaderSelected,
 .colHeaderSelected {
-    background-color: rgba(128, 128, 128, 0.548);
+    background-color: rgba(128, 128, 128, 0.364);
 }
 
 .editing {
@@ -32,4 +32,9 @@ td {
 
 input:focus {
     outline: none;
+    /* background-color: yellow; */
+}
+
+input {
+    /* background-color: red; */
 }
