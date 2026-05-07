@@ -45,7 +45,7 @@ jobs:
       - name: install frontend dependencies
         run: npm install # or yarn install / pnpm install
 
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ATTENTION: You MUST add these two lines for the UPDATER to work
