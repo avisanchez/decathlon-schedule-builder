@@ -1,7 +1,6 @@
 import ExcelJS from 'exceljs';
 import { DaySchedule } from '../algo/types';
 import { writeFile } from '@tauri-apps/plugin-fs';
-import { BaseDirectory, downloadDir } from '@tauri-apps/api/path';
 import { save } from '@tauri-apps/plugin-dialog';
 
 
@@ -23,7 +22,8 @@ export async function exportDayScheduleToWorkbook(weekSchedule: DaySchedule[]): 
      * - Groups stay consistent across a given week
      * - Assuming the title is week 1
      */
-    weekSchedule[0].getGroupNames().forEach((groupName, groupIndex) => {
+    const groupNames = weekSchedule[0].getGroupNames();
+    groupNames.forEach((groupName, groupIndex) => {
         const sheet = workbook.addWorksheet(groupName);
 
         sheet.getRow(1).values = [groupName];

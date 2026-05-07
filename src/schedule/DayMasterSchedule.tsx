@@ -1,8 +1,7 @@
 import {
     Coordinate,
     DaySchedule,
-    Schedule,
-    TimeSlot
+    Schedule
 } from "../algo/types";
 import {
     ChangeEvent,
@@ -138,12 +137,6 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
         const newSelectedCell: Coordinate = { row: row, col: col };
         const isSameCell = isSelected(newSelectedCell);
         setAnchorCell({ cell: newSelectedCell, editable: isSameCell, content: content === "" ? null : content });
-    }
-
-    function onClickInput(row: number, col: number): void {
-        if (!isSelected({ row: row, col: col })) {
-
-        }
     }
 
     function onChange(e: ChangeEvent<HTMLInputElement, HTMLInputElement>): void {

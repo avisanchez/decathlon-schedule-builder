@@ -1,43 +1,54 @@
 import { Activity } from "../activity/types"
-import { Group } from "../group/types"
-import { Constraint, Coordinate, DaySchedule, Schedule } from "./types"
-import { makeMatrix2D } from "./utils";
+import { Constraint } from "../schedule/ConstraintList";
+import { Coordinate, DaySchedule, Schedule } from "./types"
+import { isValid } from "./utils";
 
+/**
+ * The scheduler class manages the task of scheduling activities.
+ * It is capable of handling one or more day schedules simultaneously 
+ * that may or may not be partially filled out.
+ * 
+ * usage: 
+ * 1) Create an instance of the schedule | const s = new Scheduler();
+ * 2) Initalize the scheduler with the relevant parameters | s.init(...)
+ * 3) Call run to generate the best schedule | const bestSchedule = s.run()
+ * 
+ */
 class Scheduler {
     private MAX_ITERATIONS = 10000;
 
     constructor() {
-        this.daySchedules = [];
+        this.weekSchedule = [];
         this.activities = [];
         this.constraints = [];
     }
 
-    public init(daySchedules: DaySchedule[], activities: Activity[], constraints: Constraint[]) {
-        this.daySchedules = daySchedules;
-        this.activities = activities.filter(activity => !activity.special);
+    public init(weekSchedule: DaySchedule[], activities: Activity[], constraints: Constraint[]) {
+        this.weekSchedule = weekSchedule;
+        this.activities = activities;
         this.constraints = constraints;
     }
 
-    /**
-     * Reset all scheduling variables to their inital values.
-     */
-    private reset() {
-        this.currSchedule = this.daySchedules.map(daySchedule => daySchedule.getSchedule());
-        this.bestSchedule = [];
-        this.currScore = 0;
-        this.bestScore = -Infinity;
-        this.numCellsToFill = this.countCellsToFill();
-        this.iterations = 0;
-    }
-
     public run(): Schedule[] {
-        if (this.daySchedules.length === 0) {
+        if (this.weekSchedule.length === 0) {
             throw new Error("Nothing to be done. It is likely that init() was forgotten.")
         }
         this.reset();
         this.genDaySchedule();
         console.log("The best schedule found was", this.bestSchedule[0]);
         return this.bestSchedule[0];
+    }
+
+    /**
+     * Reset all scheduling variables to their inital values.
+     */
+    private reset() {
+        this.currSchedule = this.weekSchedule.map(daySchedule => daySchedule.getSchedule());
+        this.bestSchedule = [];
+        this.currScore = 0;
+        this.bestScore = -Infinity;
+        this.numCellsToFill = this.countCellsToFill();
+        this.iterations = 0;
     }
 
     /**
@@ -69,9 +80,29 @@ class Scheduler {
      * @returns An array of available activities.
      */
     private getValidActivities(cell: Coordinate): Activity[] {
-        return this.activities.filter(activity => {
-            return this.constraints.every(c => c.isValid(activity.code, { day: this.currScheduleIndex, row: cell.row, col: cell.col }, this.daySchedules));
-        });
+        let validActivities: Activity[] = [];
+
+        for (let i = 0; i < this.activities.length; ++i) {
+            const activity = this.activities[i];
+            let valid = activity.special === false;
+            for (let j = 0; j < this.constraints.length; ++j) {
+                const constraint = this.constraints[j];
+
+                // deal with fuckass mandatory constraints differntly
+                if (constraint.type === "mandatory") {
+                    const applicable = constraint.time === this.weekSchedule[this.currScheduleIndex].getTime(cell.col);
+                    if (applicable) {
+                        if (constraint.activity === activity.code) {
+                            return [{ code: activity.code ?? "[ERROR]" }]
+                        }
+                    }
+                }
+                const passed = isValid(constraint, activity, { day: this.currScheduleIndex, row: cell.row, col: cell.col }, this.weekSchedule);
+                valid = valid && passed;
+            }
+            if (valid) validActivities.push(activity);
+        }
+        return validActivities;
     }
 
     /**
@@ -106,6 +137,17 @@ class Scheduler {
         return this.numCellsToFill > Math.abs(this.bestScore - this.currScore);
     }
 
+    private shuffle<T>(array: T[]) {
+        for (let i = array.length - 1; i > 0; i--) {
+            // Generate a random index from 0 to i
+            const j = Math.floor(Math.random() * (i + 1));
+
+            // Swap elements array[i] and array[j] using destructuring
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
     /**
      * Recursivley find the best schedule.
      * 
@@ -119,6 +161,7 @@ class Scheduler {
         this.iterations++;
 
         if (this.iterations > this.MAX_ITERATIONS) {
+            this.bestSchedule.push(structuredClone(this.currSchedule));
             console.error(`${this.genDaySchedule.name} reached the maximum number of iterations.`)
             return;
         }
@@ -153,17 +196,20 @@ class Scheduler {
         this.currScheduleIndex = nextCell.scheduleIndex;
 
         let availableActivities = this.getValidActivities(cell);
-        availableActivities = availableActivities.sort((a, b) => {
-            if (a.multigroup === true && b.multigroup === true) {
-                return 0;
-            } else if (a.multigroup === true && b.multigroup === false) {
-                return -1;
-            } else {
-                return 1;
-            }
-        })
+        if (availableActivities.length === 0) { return console.error("found no valid activities"); }
+        this.shuffle(availableActivities);
+        // availableActivities = availableActivities.sort((a, b) => {
+        //     if (a.multigroup === true && b.multigroup === true) {
+        //         return 0;
+        //     } else if (a.multigroup === true && b.multigroup === false) {
+        //         return -1;
+        //     } else {
+        //         return 1;
+        //     }
+        // })
 
         availableActivities.forEach(activity => {
+            if (this.iterations > this.MAX_ITERATIONS) { return; }
             // set activity
             this.currSchedule[this.currScheduleIndex][cell.row][cell.col] = activity.code;
             this.numCellsToFill--;
@@ -180,7 +226,7 @@ class Scheduler {
 
     // A list of available activities to choose from, initalized once
     private activities: Activity[] = [];
-    private daySchedules: DaySchedule[];
+    private weekSchedule: DaySchedule[];
     private constraints: Constraint[];
 
     /** Algorithm vars  */

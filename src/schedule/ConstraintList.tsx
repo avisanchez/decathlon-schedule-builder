@@ -11,13 +11,16 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 export type Constraint =
     | { type: "empty" }
     | { type: "single" }
+    | { type: "regular" }
     | { type: "mandatory", activity?: string, time?: string }
     | { type: "multi", activity?: string, groupings?: Set<number>[] }
     | { type: "time", activity?: string, validTimes?: Set<string> }
     | { type: "group", activity?: string, allowed?: boolean, groups?: Set<number> }
 
-function ConstraintList() {
-    let [constraints, setConstraints] = useState<Constraint[]>([]);
+function ConstraintList({ constraints, onChange }: {
+    constraints: Constraint[],
+    onChange: (updatedConstraints: Constraint[]) => void
+}) {
     let [focusIndex, setFocusIndex] = useState<number | null>(null);
     let [hoverIndex, setHoverIndex] = useState<number | null>(null);
     // Reset focus when clicking outside the entire list
@@ -43,6 +46,12 @@ function ConstraintList() {
                 return c.activity !== undefined && c.time !== undefined;
             case "multi":
                 return true; /** @todo: this will have to be more comprehensive later */
+            case "time":
+                return c.activity !== undefined && c.validTimes !== undefined;
+            case "single":
+                return true;
+            case "regular":
+                return true;
             default:
                 return false;
         }
@@ -55,9 +64,9 @@ function ConstraintList() {
             }}
         >
             <button
-                onClick={() =>
-                    setConstraints(prev => [{ type: "empty" }, ...prev])
-                }
+                onClick={() => {
+                    onChange([{ type: "empty" }, ...constraints]);
+                }}
             >
                 Add Constraint
             </button>
@@ -87,6 +96,7 @@ function ConstraintList() {
                                     setFocusIndex(null);
                                     setHoverIndex(i);
                                 }}
+                                hidden={constraint.type === "regular" || constraint.type === "single" || constraint.type === "multi"}
                             >
                                 {
                                     hoverIndex === i ?
@@ -104,11 +114,12 @@ function ConstraintList() {
                                                     }
                                                     setFocusIndex(null);
                                                     setHoverIndex(null);
-                                                    setConstraints((prev) => {
-                                                        return prev.filter((_, j) => {
+
+                                                    onChange(
+                                                        constraints.filter((_, j) => {
                                                             return i !== j;
                                                         })
-                                                    })
+                                                    );
                                                 }}
                                             >
                                                 Delete
@@ -126,14 +137,14 @@ function ConstraintList() {
                                 }
                             </div>
 
-
-                            <ConstraintListItem focused={focusIndex === i} constraint={constraint} onChange={(updatedConstraint) => {
-                                setConstraints(prev => {
-                                    let updatedConstraints = [...prev];
+                            <div>
+                                <ConstraintListItem focused={focusIndex === i} constraint={constraint} onChange={(updatedConstraint) => {
+                                    let updatedConstraints = [...constraints];
                                     updatedConstraints[i] = updatedConstraint;
-                                    return updatedConstraints;
-                                });
-                            }} />
+                                    onChange(updatedConstraints);
+                                }} />
+                            </div>
+
                         </div>
                     )
                 })}
@@ -169,7 +180,8 @@ function ConstraintListItem({ constraint, focused, onChange }: {
             readOnly={!focused}
             onChange={(newConstraint) => onChange && onChange(newConstraint)}
         />,
-        single: <div>TODO</div>,
+        single: <div>A group can participate in an actvitity at most once per day.</div>,
+        regular: <div>Apart from multi-group activities, two groups cannot participate in the same activity at the same time.</div>,
         empty: <EmptyConstraintView readOnly={!focused} />
     }
 
@@ -191,7 +203,8 @@ function ConstraintListItem({ constraint, focused, onChange }: {
                 }}
             >
                 <select
-                    hidden={!focused} value={constraint.type}
+                    hidden={!focused || constraint.type === "multi" || constraint.type === "regular" || constraint.type === "single"}
+                    value={constraint.type}
                     onChange={async (e) => {
                         const value = e.target.value;
                         if (constraint.type !== "empty") {
@@ -220,7 +233,7 @@ function ConstraintListItem({ constraint, focused, onChange }: {
                     background: "rgba(0, 0, 0, 0.1)",
                     borderRadius: "999px"
                 }}
-                hidden={!focused}
+                hidden={!focused || constraint.type === "multi" || constraint.type === "regular" || constraint.type === "single"}
             />
             {VIEWS[constraint.type]}
         </div >
@@ -256,7 +269,7 @@ function GroupConstraintView({ readOnly, constraint, onChange }: {
         return;
     }
 
-    const { groups, activities, times } = useContext(WorkspaceContext);
+    const { groups, activities } = useContext(WorkspaceContext);
     let allGroupNums = groups.flatMap(group => group.isSplit ? [group.groupNum, group.groupNum + 0.5] : group.groupNum);
 
     return (
@@ -385,7 +398,7 @@ function TimeConstraintView({ readOnly, constraint, onChange }: {
         return;
     }
 
-    const { groups, activities, times } = useContext(WorkspaceContext);
+    const { activities, times } = useContext(WorkspaceContext);
 
     return (
         <div>
@@ -445,7 +458,7 @@ function MultiGroupConstraintView({ readOnly, constraint, onChange }: {
     if (constraint.type !== "multi") {
         return;
     }
-    const { groups, activities, times } = useContext(WorkspaceContext);
+    const { groups } = useContext(WorkspaceContext);
 
     const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const MAX_META_GROUPS = ALPHABET.length;
@@ -466,31 +479,13 @@ function MultiGroupConstraintView({ readOnly, constraint, onChange }: {
             flexDirection: "column"
         }}>
             <div>
-                {
-                    readOnly ?
-                        <span
-                            style={{
-                                fontWeight: "bold"
-                            }}
-                        >
-                            {constraint.activity ?? "{Activity}"}
-                        </span>
-                        :
-                        <select
-                            value={constraint.activity}
-                            onChange={(e) => {
-                                const newActivity = e.target.value === "" ? undefined : e.target.value;
-                                if (onChange) onChange({ ...constraint, activity: newActivity });
-                            }}
-                        >
-                            <option value={""}></option>
-                            {activities.map(activity => {
-                                return (
-                                    <option value={activity.code}>{activity.code}</option>
-                                )
-                            })}
-                        </select>
-                }
+                <span
+                    style={{
+                        fontWeight: "bold"
+                    }}
+                >
+                    {constraint.activity ?? "{Activity}"}
+                </span>
                 <span> is multi-group </span>
             </div>
             <div
@@ -585,7 +580,7 @@ function MandatoryConstraintView({ readOnly, constraint, onChange }: {
     if (constraint.type !== "mandatory") {
         return;
     }
-    const { groups, activities, times } = useContext(WorkspaceContext);
+    const { activities, times } = useContext(WorkspaceContext);
 
     return (
         <div>

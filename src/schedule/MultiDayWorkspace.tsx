@@ -1,80 +1,93 @@
 import { useEffect, useState } from "react";
 import DayMasterSchedule from "./DayMasterSchedule";
-import { Constraint, DaySchedule, MultiGroupActivityConstraint, SingleInstanceConstraint } from "../algo/types";
+import { DaySchedule } from "../algo/types";
 import { Group } from "../group/types";
 import Scheduler from "../algo/Scheduler";
 import { exportDayScheduleToWorkbook } from "../utils/export";
 import { Activity } from "../activity/types";
 import ActivitySettings from "./ActivitySettings";
 import GroupSettings from "./GroupSettings";
-import ConstraintList from "./ConstraintList";
+import ConstraintList, { Constraint } from "./ConstraintList";
 import { WorkspaceContext } from "../context/WorkspaceContext";
 import { confirm } from "@tauri-apps/plugin-dialog";
 
+// constants
+const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const weekdayAbbrs = ["M", "T", "W", "Th", "F"]
+const defaultTimeSlots = ["9:30", "10:15", "10:30", "11:15", "12:00", "1:10", "1:50", "2:30", "2:45"];
+const defaultGroups: Group[] = Array.from({ length: 16 }, (_, i) => (
+    {
+        groupNum: i + 1,
+        isSplit: false
+    }
+));
+const defaultConstraints: Constraint[] = [
+    { type: "mandatory", activity: "SNACK", time: "10:15" },
+    { type: "mandatory", activity: "LUNCH", time: "12:00" },
+    { type: "mandatory", activity: "REST/POPS", time: "2:30" },
+    { type: "regular" },
+    { type: "single" }
+]
+
+const defaultActivities: Activity[] = [
+    { code: "A&C", name: "Arts and Crafts" },
+    { code: "BG", name: "Board Game Room" },
+    { code: "BK1", name: "Basketball (Low Hoops)" },
+    { code: "BK2", name: "Basketball (Normal Hoops)" },
+    { code: "BKT", name: "Basketball Tournament" },
+    { code: "BT", name: "Black Top Games" },
+    { code: "CTF", name: "Capture the Flag", multigroup: true },
+    { code: "DGB", name: "Dodgeball Arena", multigroup: true },
+    { code: "FR", name: "Frisbee" },
+    { code: "FB", name: "Football" },
+    { code: "GAGA1", name: "Gagaball (Wood Court)" },
+    { code: "GAGA2", name: "Gagaball (Fence Court)" },
+    { code: "HK", name: "Hockey" },
+    { code: "LA", name: "Last Activity", special: true },
+    { code: "MULTI", name: "Multipurpose Room", multigroup: true },
+    { code: "OR", name: "Orientation", special: true },
+    { code: "PB", name: "Pickleball" },
+    { code: "PG", name: "Playground" },
+    { code: "PP", name: "Ping Pong Room" },
+    { code: "ROCH", name: "Rochambeau Tournament", special: true },
+    { code: "SOC", name: "Soccer" },
+    { code: "ST", name: "Soccer Tournament", special: true },
+    { code: "T&C", name: "Throw and Catch" },
+    { code: "TH", name: "Team Handball" },
+    { code: "TTHOF", name: "Taste test/Hall of Fame", special: true },
+    { code: "TUG", name: "Tug of War", special: true },
+    { code: "VB", name: "Volleyball" },
+    { code: "WALL", name: "Wall Ball" },
+    { code: "WB1", name: "Whiffleball (Small Field)" },
+    { code: "WB2", name: "Whiffleball (Big Field)" },
+    { code: "SNACK", name: "Snack Break", special: true },
+    { code: "LUNCH", name: "Lunch Break", special: true },
+    { code: "REST/POPS", name: "Popsicle Break", special: true }
+]
+
+
 function MultiDayWorkspace() {
 
-    // constants
-    const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-    const weekdayAbbrs = ["M", "T", "W", "Th", "F"]
-    const defaultTimeSlots = ["9:30", "10:15", "10:30", "11:15", "12:00", "1:10", "1:50", "2:30", "2:45"];
-    const defaultGroups: Group[] = Array.from({ length: 16 }, (_, i) => (
-        {
-            groupNum: i + 1,
-            isSplit: false
-        }
-    ));
-    const defaultActivities: Activity[] = [
-        "A&C",
-        "BG",
-        "BK1",
-        "BK2",
-        "BKT",
-        "BT",
-        "CTF",
-        "DGB",
-        "FR",
-        "FB",
-        "GAGA1",
-        "GAGA2",
-        "HK",
-        "LA*",
-        "MULTI",
-        "OR*",
-        "PB",
-        "PG",
-        "PP",
-        "ROCH*",
-        "SOC",
-        "ST*",
-        "T&C",
-        "TH",
-        "TTHOF*",
-        "TUG*",
-        "VB",
-        "WALL",
-        "WB1",
-        "WB2",
-        "SNACK*",
-        "LUNCH*",
-        "REST/POPS*"
-    ].map<Activity>(code => { return { code: code.trim().substring(0, code.endsWith("*") ? code.length - 1 : undefined), special: code.endsWith("*") } });
-
+    // state
     let [workspace, setWorkspace] = useState({ groups: defaultGroups, activities: defaultActivities, times: defaultTimeSlots });
     let [weekSchedule, setWeekSchedule] = useState<DaySchedule[]>(
         Array.from({ length: 5 }, () =>
             new DaySchedule(workspace.groups, workspace.times)
         )
-    )
-
-    let [constraints, setConstraints] = useState<Constraint[]>([]);
-
-    let scheduler = new Scheduler();
+    );
 
     // allow for collapsable day schedules
     let [visibleSchedules, setVisibleSchedules] = useState<boolean[]>(new Array(weekSchedule.length).fill(true));
     useEffect(() => {
         console.log(visibleSchedules);
     }, [visibleSchedules]);
+    let [constraints, setConstraints] = useState<Constraint[]>([...defaultConstraints]);
+
+    // allow for simple activity search
+    let [searchterm, setSearchterm] = useState<string>();
+    let [inSettings, setInSettings] = useState(true); // fix this later: this is currently how you toggle to the settings page
+
+    const scheduler = new Scheduler();
 
     function getEmptyWeekSchedule(): DaySchedule[] {
         return Array.from({ length: 5 }, () =>
@@ -85,12 +98,25 @@ function MultiDayWorkspace() {
     // update week schedule when groups change
     useEffect(() => {
         setWeekSchedule(getEmptyWeekSchedule());
-    }, [workspace.groups]);
+        const expandedGroups = workspace.groups.flatMap(group => group.isSplit ? [group.groupNum, group.groupNum + 0.5] : group.groupNum);
+        const youngerGroups = new Set(expandedGroups.filter(gn => gn <= 4 || (gn > 10 && gn < 15)));
+        const youngestGroups = new Set(expandedGroups.filter(gn => gn < 4 || (gn > 10 && gn < 13)));
+        const multigroupConstraints = workspace.activities.filter(a => a.multigroup).map<Constraint>(a => {
+            return { type: "multi", activity: a.code }
+        })
+        setConstraints([
+            ...multigroupConstraints,
+            { type: "group", activity: "BK1", allowed: true, groups: youngerGroups },
+            { type: "group", activity: "BK2", allowed: false, groups: youngerGroups },
+            { type: "group", activity: "GAGA1", allowed: true, groups: youngerGroups },
+            { type: "group", activity: "GAGA2", allowed: false, groups: youngerGroups },
+            { type: "group", activity: "WB1", allowed: true, groups: youngerGroups },
+            { type: "group", activity: "WB2", allowed: false, groups: youngerGroups },
+            { type: "group", activity: "T&C", allowed: true, groups: youngestGroups },
+            ...defaultConstraints
+        ]);
+    }, [inSettings, workspace]);
 
-    // allow for simple activity
-    let [searchterm, setSearchterm] = useState<string>();
-
-    let [inSettings, setInSettings] = useState(false);
 
     return (
         <WorkspaceContext.Provider value={workspace}>
@@ -125,12 +151,10 @@ function MultiDayWorkspace() {
                                 const proceed = await confirm("Switching to the settings page will delete all constraints and schedule data.");
                                 if (!proceed) { return; }
                             }
-                            setConstraints([]);
-                            setWeekSchedule(getEmptyWeekSchedule());
                             setInSettings(prev => !prev);
                         }}
                     >
-                        Settings
+                        {inSettings ? "Workspace" : "Settings"}
                     </button>
 
                     <div
@@ -156,9 +180,13 @@ function MultiDayWorkspace() {
 
                     {/* Generate button */}
                     <button
-                        onClick={() => {
-                            scheduler.init(weekSchedule, defaultActivities, [...constraints, new SingleInstanceConstraint(), new MultiGroupActivityConstraint(new Map)]);
+                        onClick={async () => {
+                            scheduler.init(weekSchedule, workspace.activities, constraints);
                             const newSchedules = scheduler.run();
+                            if (newSchedules === undefined || newSchedules?.length === 0) {
+                                await confirm("Something is wrong with the constraints. Unable to generate schedule.");
+                                return;
+                            }
                             const updatedDaySchedules = weekSchedule.map((daySchedule, i) => {
                                 daySchedule.setSchedule(newSchedules[i]);
                                 return daySchedule;
@@ -230,7 +258,7 @@ function MultiDayWorkspace() {
                     <div
                         style={{
                             position: "fixed",
-                            width: "98.5%",
+                            width: "98.5%"
                         }}
                     >
                         <h2>Constraints</h2>
@@ -243,7 +271,7 @@ function MultiDayWorkspace() {
                                 height: 190
                             }}
                         >
-                            <ConstraintList />
+                            <ConstraintList constraints={constraints} onChange={(updatedConstraints) => setConstraints(updatedConstraints)} />
                         </div>
                     </div>
                 </div>

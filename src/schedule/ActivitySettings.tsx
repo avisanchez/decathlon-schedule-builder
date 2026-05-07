@@ -1,11 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity } from "../activity/types";
 
 
-function ActivitySettings({ activities, onChange, onSave }: {
+function ActivitySettings({ activities, onChange }: {
     activities: Activity[],
-    onChange?: (updatedActivities: Activity[]) => void,
-    onSave?: (updatedActivities: Activity[]) => void
+    onChange?: (updatedActivities: Activity[]) => void
 }) {
     return (
         <div>
@@ -13,7 +12,7 @@ function ActivitySettings({ activities, onChange, onSave }: {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, max-content)", gap: "10px" }}>
                 {activities.map((activity, i) => {
                     return (
-                        <ActivityCard activity={activity} onSave={(updatedActivity) => {
+                        <ActivityCard activity={activity} onChange={(updatedActivity) => {
                             const updatedActivities = activities.map<Activity>((activity, j) => {
                                 return i === j ? updatedActivity : activity;
                             });
@@ -26,17 +25,23 @@ function ActivitySettings({ activities, onChange, onSave }: {
     )
 }
 
-function ActivityCard({ activity, focused, onSave }: { activity: Activity, focused?: boolean, onSave?: (activity: Activity) => void }) {
+function ActivityCard({ activity, focused, onChange }: {
+    activity: Activity,
+    focused?: boolean,
+    onChange?: (activity: Activity) => void
+}) {
     let [name, setName] = useState("");
     let [code, setCode] = useState(activity.code);
-
     let [focusState, setFocusState] = useState(focused ?? false);
+
+    useEffect(() => {
+        setCode(activity.code);
+        setName(activity.name ?? "");
+    }, [activity]);
 
     function isCodeValid(): boolean {
         return code !== "";
     }
-
-    let typeRef = useRef<HTMLSelectElement | null>(null);
 
     if (focusState === true) {
         return (
@@ -72,15 +77,39 @@ function ActivityCard({ activity, focused, onSave }: { activity: Activity, focus
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", width: "fit-content", marginBottom: "10px" }}>
                     <label>Type</label>
-                    <select ref={typeRef}>
-                        <option>Regular</option>
-                        <option>Special</option>
+                    <select
+                        value={activity.special ? "special" : activity.multigroup ? "multi-group" : "regular"}
+                        onChange={(e) => {
+                            if (e.target.value === "special") {
+                                activity.special = true;
+                                activity.multigroup = false;
+                            } else if (e.target.value === "multi-group") {
+                                activity.multigroup = true;
+                                activity.special = false;
+                            } else {
+                                activity.multigroup = false;
+                                activity.special = false;
+                            }
+                            if (onChange) { onChange({ ...activity }) }
+                        }}
+                    >
+                        <option value={"regular"}>Regular</option>
+                        <option value={"multi-group"}>Multi-Group</option>
+                        <option value={"special"}>Special</option>
                     </select>
                 </div>
-                <button style={{ width: "100%" }} disabled={!isCodeValid()} onClick={() => {
-                    onSave && onSave({ ...activity, name: name, code: code, multigroup: typeRef.current?.value === "Multi-Group", special: typeRef.current?.value === "Special" });
-                    setFocusState(false);
-                }}>Save</button>
+                <button
+                    style={{ width: "100%" }}
+                    disabled={!isCodeValid()}
+                    onClick={() => {
+                        if (onChange) onChange({
+                            ...activity,
+                            name: name,
+                            code: code
+                        });
+                        setFocusState(false);
+                    }}
+                >Save</button>
             </div>
         )
     } else {

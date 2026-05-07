@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Group } from "../group/types";
 
-function GroupSettings({ groups, onChange, onSave }: {
+function GroupSettings({ groups, onChange }: {
     groups: Group[],
-    onChange?: (updatedGroups: Group[]) => void,
-    onSave?: (updatedGroups: Group[]) => void,
+    onChange?: (updatedGroups: Group[]) => void
 }) {
 
     let [numGroups, setNumGroups] = useState(`${groups.length}`);
@@ -51,7 +50,7 @@ function GroupSettings({ groups, onChange, onSave }: {
     )
 }
 
-function GroupCard({ group, focused, onChange }: { group: Group, focused?: boolean, onChange?: (updatedGroup: Group) => void }) {
+function GroupCard({ group, onChange }: { group: Group, onChange?: (updatedGroup: Group) => void }) {
 
     function handleClick(): void {
         if (onChange) { onChange({ ...group, isSplit: !group.isSplit }); }
