@@ -58,25 +58,14 @@ function ConstraintList({ constraints, onChange }: {
     }
 
     return (
-        <div
-            style={{
-                padding: "10px"
-            }}
-        >
-            <button
-                onClick={() => {
-                    onChange([{ type: "empty" }, ...constraints]);
-                }}
-            >
-                Add Constraint
-            </button>
+        <div>
             <ul
                 ref={listRef}
                 onClick={() => setFocusIndex(null)}
                 style={{
                     width: "fit-content",
                     paddingLeft: "10px",
-                    marginTop: "5px"
+                    margin: "0px"
                 }}
             >
                 {constraints.map((constraint, i) => {
@@ -467,6 +456,18 @@ function MultiGroupConstraintView({ readOnly, constraint, onChange }: {
 
     if (groupings === undefined) {
         groupings = Array.from({ length: MAX_META_GROUPS }, (_, i) => i === 0 ? new Set(expandedGroups) : new Set());
+        if (onChange) onChange({ ...constraint, groupings: groupings });
+        return;
+    } else if (groupings.length !== MAX_META_GROUPS) {
+        groupings = Array.from({ length: MAX_META_GROUPS }, (_, i) => {
+            if (groupings === undefined) {
+                return new Set();
+            } else if (i >= groupings.length) {
+                return new Set();
+            } else {
+                return groupings[i];
+            }
+        });
         if (onChange) onChange({ ...constraint, groupings: groupings });
         return;
     }

@@ -84,7 +84,7 @@ class Scheduler {
 
         for (let i = 0; i < this.activities.length; ++i) {
             const activity = this.activities[i];
-            let valid = activity.special === false;
+            let valid = activity.special !== true; // sneaky error: this used to be activity.special === false, but since it could also be undefined the comparison would fail
             for (let j = 0; j < this.constraints.length; ++j) {
                 const constraint = this.constraints[j];
 

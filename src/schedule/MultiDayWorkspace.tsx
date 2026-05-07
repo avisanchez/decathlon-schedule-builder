@@ -10,6 +10,7 @@ import GroupSettings from "./GroupSettings";
 import ConstraintList, { Constraint } from "./ConstraintList";
 import { WorkspaceContext } from "../context/WorkspaceContext";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { hide } from "@tauri-apps/api/app";
 
 // constants
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -86,6 +87,9 @@ function MultiDayWorkspace() {
     // allow for simple activity search
     let [searchterm, setSearchterm] = useState<string>();
     let [inSettings, setInSettings] = useState(true); // fix this later: this is currently how you toggle to the settings page
+    let [hideConstraints, setHideConstraints] = useState(inSettings);
+    let [constraintHeight, setConstraintHeight] = useState(400);
+    let [dragging, setDragging] = useState(false);
 
     const scheduler = new Scheduler();
 
@@ -102,8 +106,32 @@ function MultiDayWorkspace() {
         const youngerGroups = new Set(expandedGroups.filter(gn => gn <= 4 || (gn > 10 && gn < 15)));
         const youngestGroups = new Set(expandedGroups.filter(gn => gn < 4 || (gn > 10 && gn < 13)));
         const multigroupConstraints = workspace.activities.filter(a => a.multigroup).map<Constraint>(a => {
-            return { type: "multi", activity: a.code }
-        })
+
+            let ideaNumGroupsPerGrouping = 2;
+            if (a.code === "CTF") {
+                ideaNumGroupsPerGrouping = 4;
+            } else if (a.code === "DGB") {
+                ideaNumGroupsPerGrouping = 3;
+            }
+
+            let groupings: Set<number>[] = [];
+            for (let i = 0; i < workspace.groups.length; ++i) {
+                const indexToInsetAt = groupings.length === 0 ? 0
+                    : groupings[groupings.length - 1].size > ideaNumGroupsPerGrouping - 1 ?
+                        groupings.length :
+                        groupings.length - 1;
+                const group: Group = workspace.groups[i];
+                if (indexToInsetAt < groupings.length) {
+                    groupings[indexToInsetAt].add(group.groupNum);
+                    if (group.isSplit) { groupings[indexToInsetAt].add(group.groupNum + 0.5); }
+                } else {
+                    const newGrouping = new Set<number>([group.groupNum]);
+                    if (group.isSplit) { newGrouping.add(group.groupNum + 0.5); }
+                    groupings.push(newGrouping);
+                }
+            }
+            return { type: "multi", activity: a.code, groupings: groupings }
+        });
         setConstraints([
             ...multigroupConstraints,
             { type: "group", activity: "BK1", allowed: true, groups: youngerGroups },
@@ -116,6 +144,23 @@ function MultiDayWorkspace() {
             ...defaultConstraints
         ]);
     }, [inSettings, workspace]);
+
+    useEffect(() => {
+        if (dragging) {
+            const mouseMoveHandler = (e: MouseEvent) => {
+                setConstraintHeight(e.clientY);
+            };
+            const mouseUpHandler = (e: MouseEvent) => {
+                setDragging(false);
+            };
+            document.addEventListener("mousemove", mouseMoveHandler);
+            document.addEventListener("mouseup", mouseUpHandler);
+            return () => {
+                document.removeEventListener(`mousemove`, mouseMoveHandler);
+                document.removeEventListener("mouseup", mouseUpHandler);
+            };
+        }
+    }, [dragging]);
 
 
     return (
@@ -155,6 +200,16 @@ function MultiDayWorkspace() {
                         }}
                     >
                         {inSettings ? "Workspace" : "Settings"}
+                    </button>
+
+                    {/* Hide/show constraints button */}
+                    <button
+                        disabled={inSettings}
+                        onClick={() => {
+                            setHideConstraints(prev => !prev);
+                        }}
+                    >
+                        {hideConstraints ? "Show Constraints" : "Hide Constraints"}
                     </button>
 
                     <div
@@ -223,9 +278,24 @@ function MultiDayWorkspace() {
                     <ActivitySettings activities={workspace.activities} onChange={(updatedActivities) => setWorkspace(prev => { return { ...prev, activities: updatedActivities } })} />
                 </div>
 
-                <div hidden={inSettings}>
-                    {/* Day schedules */}
-                    <div style={{ display: "flex" }}>
+
+
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        width: "100%",
+                        overflow: "hidden"
+                    }}
+                >
+                    <div
+                        style={{
+                            display: inSettings ? "none" : "flex",
+                            width: "100%",
+                            overflowX: "auto",
+                        }}
+                    >
+                        {/* Day schedules */}
                         {weekSchedule.map((daySchedule, i) => {
                             return (
                                 <div key={weekdays[i]} style={{ padding: 10 }}>
@@ -257,24 +327,75 @@ function MultiDayWorkspace() {
 
                     <div
                         style={{
-                            position: "fixed",
-                            width: "98.5%"
+                            display: hideConstraints || inSettings ? "none" : "flex",
+                            flexDirection: "column",
+                            position: "absolute",
+                            bottom: 5,
+                            left: 0,
+                            width: "100%",
+                            top: constraintHeight,
+                            background: "rgb(255, 255, 255)",
                         }}
                     >
-                        <h2>Constraints</h2>
+                        <div
+                            style={{
+                                display: "flex",
+                                backgroundColor: "transparent",
+                                width: "100%",
+                                justifyContent: "center",
+                                borderTop: "1px solid rgba(0,0,0,0.16)",
+                                borderRadius: "10px"
+                            }}
+                            onMouseDown={() => setDragging(true)}
+                        >
+                            <div
+                                style={{
+                                    background: "rgba(0,0,0,0.16)",
+                                    width: "100px",
+                                    height: "7px",
+                                    borderRadius: "999px"
+                                }}
+                            />
+                        </div>
+
+
+
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                paddingLeft: 10
+                            }}
+                        >
+                            <h2>Constraints</h2>
+                            <button
+                                onClick={() => {
+                                    setConstraints([{ type: "empty" }, ...constraints]);
+                                }}
+                                style={{
+                                    height: "fit-content",
+                                    padding: "7px",
+                                    margin: "10px",
+                                }}
+                            >
+                                + Add Constraint
+                            </button>
+                        </div>
+
                         <div
                             style={{
                                 overflowX: "scroll",
                                 overflowY: "scroll",
-                                border: "1px solid rgb(0, 0, 0)",
                                 borderRadius: 10,
-                                height: 190
+                                height: "100%",
                             }}
                         >
                             <ConstraintList constraints={constraints} onChange={(updatedConstraints) => setConstraints(updatedConstraints)} />
                         </div>
                     </div>
                 </div>
+
+
 
             </div>
         </WorkspaceContext.Provider>
