@@ -1,6 +1,6 @@
 [package]
 name = "decathlon_schedule_builder"
-version = "1.0.0"
+version = "1.0.1"
 description = "A schedule builder application for Decathlon Sports Club of Los Altos"
 authors = ["Avi Sanchez <aysanchez05@icloud.com>"]
 edition = "2021"
