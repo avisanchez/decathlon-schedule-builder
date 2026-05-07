@@ -10,7 +10,6 @@ import GroupSettings from "./GroupSettings";
 import ConstraintList, { Constraint } from "./ConstraintList";
 import { WorkspaceContext } from "../context/WorkspaceContext";
 import { confirm } from "@tauri-apps/plugin-dialog";
-import { hide } from "@tauri-apps/api/app";
 
 // constants
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -150,7 +149,7 @@ function MultiDayWorkspace() {
             const mouseMoveHandler = (e: MouseEvent) => {
                 setConstraintHeight(e.clientY);
             };
-            const mouseUpHandler = (e: MouseEvent) => {
+            const mouseUpHandler = (_: MouseEvent) => {
                 setDragging(false);
             };
             document.addEventListener("mousemove", mouseMoveHandler);
