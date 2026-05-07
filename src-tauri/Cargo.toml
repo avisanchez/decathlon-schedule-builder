@@ -1,8 +1,8 @@
 [package]
 name = "decathlon_schedule_builder"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.0.0"
+description = "A schedule builder application for Decathlon Sports Club of Los Altos"
+authors = ["Avi Sanchez <aysanchez05@icloud.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,4 +28,3 @@ tauri-plugin-process = "2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
-
