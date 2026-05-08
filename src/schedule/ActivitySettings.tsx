@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity } from "../activity/types";
+import { Activity } from "../types";
 
 
 function ActivitySettings({ activities, onChange }: {

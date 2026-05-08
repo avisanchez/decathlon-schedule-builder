@@ -1,6 +1,6 @@
 import { createContext } from "react";
-import { Group } from "../group/types";
-import { Activity } from "../activity/types";
+import { Group } from "../types";
+import { Activity } from "../types";
 
 export interface WorkspaceConfig {
     readonly groups: Group[],

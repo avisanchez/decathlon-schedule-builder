@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import DayMasterSchedule from "./DayMasterSchedule";
-import { DaySchedule } from "../algo/types";
-import { Group } from "../group/types";
+import { Group, Activity, DayScheduleIndex } from "../types";
 import Scheduler from "../algo/Scheduler";
-import { exportDayScheduleToWorkbook } from "../utils/export";
-import { Activity } from "../activity/types";
+import { exportWeekToWorkbook } from "../utils/export";
 import ActivitySettings from "./ActivitySettings";
 import GroupSettings from "./GroupSettings";
 import ConstraintList, { Constraint } from "./ConstraintList";
@@ -70,14 +68,14 @@ function MultiDayWorkspace() {
 
     // state
     let [workspace, setWorkspace] = useState({ groups: defaultGroups, activities: defaultActivities, times: defaultTimeSlots });
-    let [weekSchedule, setWeekSchedule] = useState<DaySchedule[]>(
+    let [weekIndex, setWeekIndex] = useState<DayScheduleIndex[]>(
         Array.from({ length: 5 }, () =>
-            new DaySchedule(workspace.groups, workspace.times)
+            new DayScheduleIndex(workspace.groups, workspace.times)
         )
     );
 
     // allow for collapsable day schedules
-    let [visibleSchedules, setVisibleSchedules] = useState<boolean[]>(new Array(weekSchedule.length).fill(true));
+    let [visibleSchedules, setVisibleSchedules] = useState<boolean[]>(new Array(weekIndex.length).fill(true));
     useEffect(() => {
         console.log(visibleSchedules);
     }, [visibleSchedules]);
@@ -92,15 +90,15 @@ function MultiDayWorkspace() {
 
     const scheduler = new Scheduler();
 
-    function getEmptyWeekSchedule(): DaySchedule[] {
+    function getCurrentWeekIndex(): DayScheduleIndex[] {
         return Array.from({ length: 5 }, () =>
-            new DaySchedule(workspace.groups, workspace.times)
+            new DayScheduleIndex(workspace.groups, workspace.times)
         )
     }
 
     // update week schedule when groups change
     useEffect(() => {
-        setWeekSchedule(getEmptyWeekSchedule());
+        setWeekIndex(getCurrentWeekIndex());
         const expandedGroups = workspace.groups.flatMap(group => group.isSplit ? [group.groupNum, group.groupNum + 0.5] : group.groupNum);
         const youngerGroups = new Set(expandedGroups.filter(gn => gn <= 4 || (gn > 10 && gn < 15)));
         const youngestGroups = new Set(expandedGroups.filter(gn => gn < 4 || (gn > 10 && gn < 13)));
@@ -225,7 +223,7 @@ function MultiDayWorkspace() {
                                 { title: "Decathlon Schedule Builder" }
                             );
                             if (!proceed) { return; }
-                            setWeekSchedule(getEmptyWeekSchedule());
+                            setWeekIndex(getCurrentWeekIndex());
                         }}
                         disabled={inSettings}
                     >
@@ -235,17 +233,17 @@ function MultiDayWorkspace() {
                     {/* Generate button */}
                     <button
                         onClick={async () => {
-                            scheduler.init(weekSchedule, workspace.activities, constraints);
+                            scheduler.init(weekIndex, workspace.activities, constraints);
                             const newSchedules = scheduler.run();
                             if (newSchedules === undefined || newSchedules?.length === 0) {
                                 await confirm("Something is wrong with the constraints. Unable to generate schedule.");
                                 return;
                             }
-                            const updatedDaySchedules = weekSchedule.map((daySchedule, i) => {
-                                daySchedule.setSchedule(newSchedules[i]);
-                                return daySchedule;
+                            const newWeekIndex = weekIndex.map((dayIndex, i) => {
+                                dayIndex.setSchedule(newSchedules[i]);
+                                return dayIndex;
                             });
-                            setWeekSchedule([...updatedDaySchedules]); // force new reference
+                            setWeekIndex([...newWeekIndex]); // force new reference
                         }}
                         disabled={inSettings}
                     >
@@ -254,7 +252,7 @@ function MultiDayWorkspace() {
 
                     {/* Export button */}
                     <button
-                        onClick={() => { exportDayScheduleToWorkbook(weekSchedule) }}
+                        onClick={() => { exportWeekToWorkbook(weekIndex) }}
                         disabled={inSettings}
                     >
                         Export
@@ -295,7 +293,7 @@ function MultiDayWorkspace() {
                         }}
                     >
                         {/* Day schedules */}
-                        {weekSchedule.map((daySchedule, i) => {
+                        {weekIndex.map((dayIndex, i) => {
                             return (
                                 <div key={weekdays[i]} style={{ padding: 10 }}>
 
@@ -309,12 +307,15 @@ function MultiDayWorkspace() {
 
                                     {
                                         visibleSchedules[i] &&
-                                        <DayMasterSchedule key={`master-schedule-${i}`} daySchedule={daySchedule} setDaySchedule={(newDaySchedule) => {
-                                            setWeekSchedule((prev) => {
-                                                prev[i] = newDaySchedule;
-                                                return [...prev];
-                                            });
-                                        }}
+                                        <DayMasterSchedule
+                                            key={`master-schedule-${i}`}
+                                            dayScheduleIndex={dayIndex}
+                                            setDayScheduleIndex={(newDayScheduleIndex) => {
+                                                setWeekIndex((prev) => {
+                                                    prev[i] = newDayScheduleIndex;
+                                                    return [...prev];
+                                                });
+                                            }}
                                             searchterm={searchterm}
                                         />
                                     }

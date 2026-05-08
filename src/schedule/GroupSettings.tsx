@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Group } from "../group/types";
+import { Group } from "../types";
 
 function GroupSettings({ groups, onChange }: {
     groups: Group[],

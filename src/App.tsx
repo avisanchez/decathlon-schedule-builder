@@ -5,26 +5,42 @@ import { relaunch } from '@tauri-apps/plugin-process';
 
 function App() {
     useEffect(() => {
-        // Create an async function inside the effect
-        const setupUpdater = async () => {
-            try {
-                const update = await check();
-                if (update) {
-                    console.log(`Update found: ${update.version}`);
-                    await update.downloadAndInstall();
-                    await relaunch();
-                }
-            } catch (error) {
-                // This will catch the "Could not fetch" error 
-                // and allow your app to keep running in dev mode
-                console.error("Updater failed or no release found:", error);
-            }
-        };
+        async function setupUpdater() {
+            const update = await check();
+            if (update) {
+                console.log(
+                    `found update ${update.version} from ${update.date} with notes ${update.body}`
+                );
+                let downloaded = 0;
+                let contentLength: number | undefined = 0;
+                // alternatively we could also call update.download() and update.install() separately
+                await update.downloadAndInstall((event) => {
+                    switch (event.event) {
+                        case 'Started':
+                            contentLength = event.data.contentLength;
+                            console.log(`started downloading ${event.data.contentLength} bytes`);
+                            break;
+                        case 'Progress':
+                            downloaded += event.data.chunkLength;
+                            console.log(`downloaded ${downloaded} from ${contentLength}`);
+                            break;
+                        case 'Finished':
+                            console.log('download finished');
+                            break;
+                    }
+                });
 
-        // Only run the updater in production, not during 'tauri dev'
-        // unless you are specifically testing the update flow.
-        if (!import.meta.env.DEV) {
+                console.log('update installed');
+                await relaunch();
+            }
+            console.log("no update found");
+        }
+
+        try {
             setupUpdater();
+        } catch (error) {
+            alert(`Fetching updated failed.\n\n${error}`);
+            console.error("setupUpdater failed with error: ", error);
         }
     }, []);
 

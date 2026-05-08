@@ -1,8 +1,8 @@
 import {
-    Coordinate,
-    DaySchedule,
-    Schedule
-} from "../algo/types";
+    DayScheduleCoordinate,
+    DayScheduleIndex,
+    DaySchedule
+} from "../types";
 import {
     ChangeEvent,
     useEffect,
@@ -13,25 +13,25 @@ import {
 import styles from "./DayMasterSchedule.module.css";
 
 type TableCell = {
-    cell: Coordinate
+    cell: DayScheduleCoordinate
     editable: boolean
     content: string | null
 }
 
-function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }: {
-    daySchedule: DaySchedule,
-    setDaySchedule: (daySchedule: DaySchedule) => void,
+function DayMasterSchedule({ dayScheduleIndex, setDayScheduleIndex, readOnly, searchterm }: {
+    dayScheduleIndex: DayScheduleIndex,
+    setDayScheduleIndex: (dayScheduleIndex: DayScheduleIndex) => void,
     readOnly?: boolean,
     searchterm?: string
 }) {
     const uniqueId: string = useId(); // for key generation
 
     const [anchorCell, setAnchorCell] = useState<TableCell | null>(null);
-    const [selectedCells, setSelectedCells] = useState<Set<Coordinate>>(new Set());
+    const [selectedCells, setSelectedCells] = useState<Set<DayScheduleCoordinate>>(new Set());
 
     // vars for rendering
-    const timeSlots: string[] = daySchedule.getTimeSlots();
-    const schedule: Schedule = daySchedule.getSchedule();
+    const timeSlots: string[] = dayScheduleIndex.getTimeSlots();
+    const schedule: DaySchedule = dayScheduleIndex.getSchedule();
 
     // ---------------------
     //         refs
@@ -67,7 +67,7 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
             return;
         }
         if (anchorCell.content !== schedule[anchorCell.cell.row][anchorCell.cell.col]) {
-            setDaySchedule(daySchedule);
+            setDayScheduleIndex(dayScheduleIndex);
         }
     }, [anchorCell?.content]);
 
@@ -96,13 +96,13 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
     // commit the changes of the selected cell
     function commitChanges(): void {
         if (anchorCell !== null) {
-            daySchedule.getSchedule()[anchorCell.cell.row][anchorCell.cell.col] = anchorCell.content;
-            setDaySchedule(daySchedule);
+            dayScheduleIndex.getSchedule()[anchorCell.cell.row][anchorCell.cell.col] = anchorCell.content;
+            setDayScheduleIndex(dayScheduleIndex);
         }
     }
 
     // return whether a given cell is selected
-    function isSelected(cell: Coordinate): boolean {
+    function isSelected(cell: DayScheduleCoordinate): boolean {
         if (selectedCells.has(cell)) {
             return true;
         }
@@ -117,7 +117,7 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
         return anchorCell?.cell.col === col;
     }
 
-    function isEditing(cell: Coordinate): boolean {
+    function isEditing(cell: DayScheduleCoordinate): boolean {
         return isSelected(cell) && anchorCell?.editable === true;
     }
 
@@ -134,7 +134,7 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
             return;
         }
         commitChanges();
-        const newSelectedCell: Coordinate = { row: row, col: col };
+        const newSelectedCell: DayScheduleCoordinate = { row: row, col: col };
         const isSameCell = isSelected(newSelectedCell);
         setAnchorCell({ cell: newSelectedCell, editable: isSameCell, content: content === "" ? null : content });
     }
@@ -211,7 +211,7 @@ function DayMasterSchedule({ daySchedule, setDaySchedule, readOnly, searchterm }
                                     }
                                     style={{ whiteSpace: "nowrap" }}
                                 >
-                                    {daySchedule.getGroupName(i)}
+                                    {dayScheduleIndex.getGroupName(i)}
                                 </td>
 
                                 {

@@ -1,7 +1,5 @@
-import { Activity } from "../activity/types";
-import { Group } from "../group/types";
 import { Constraint } from "../schedule/ConstraintList";
-import { DaySchedule, WeekCoordinate } from "./types";
+import { Activity, DayScheduleIndex, Group, WeekScheduleCoordinate } from "../types";
 
 /**
  * Create a 2D matrix
@@ -46,17 +44,17 @@ export function checkDimensions<T>(m1: T[][], m2: T[][]): boolean {
     return columnCountsMatch;
 }
 
-export function isValid(c: Constraint, activity: Activity, pos: WeekCoordinate, weekSchedule: DaySchedule[]): boolean {
+export function isValid(c: Constraint, activity: Activity, cell: WeekScheduleCoordinate, weekIndex: DayScheduleIndex[]): boolean {
 
     // note that the parenthesis around case statement logic is necessary to avoid duplicate variable definition errors
     switch (c.type) {
         case "single": {
-            const rowSet = new Set(weekSchedule[pos.day].getSchedule()[pos.row]);
+            const rowSet = new Set(weekIndex[cell.day].getSchedule()[cell.row]);
             return !rowSet.has(activity.code);
         }
         case "group": {
             if (activity.code !== c.activity) { return true; }
-            const currGroup: Group | undefined = weekSchedule[pos.day].getGroup(pos.row);
+            const currGroup: Group | undefined = weekIndex[cell.day].getGroup(cell.row);
             if (currGroup === undefined || c.groups === undefined || c.allowed === undefined) {
                 return false;
             }
@@ -67,17 +65,17 @@ export function isValid(c: Constraint, activity: Activity, pos: WeekCoordinate, 
                 console.error("Attempting to apply invalid 'mandatory' constraint. Ignoring constraint.")
                 return true;
             }
-            const currTime: string = weekSchedule[pos.day].getTime(pos.col);
+            const currTime: string = weekIndex[cell.day].getTime(cell.col);
             if (currTime === c.time) { return activity.code === c.activity; }
             return true;
         }
         case "regular": {
             if (activity.multigroup) { return true; }
-            const colSet = new Set(weekSchedule[pos.day].getSchedule().map(row => row[pos.col]));
+            const colSet = new Set(weekIndex[cell.day].getSchedule().map(row => row[cell.col]));
             return !(colSet.has(activity.code));
         }
         case "multi": {
-            const group: Group | undefined = weekSchedule[pos.day].getGroup(pos.row);
+            const group: Group | undefined = weekIndex[cell.day].getGroup(cell.row);
             if (group === undefined || c.activity === undefined || c.groupings === undefined) {
                 console.error("Attempting to apply invalid 'mandatory' constraint. Ignoring constraint.")
                 return true;
@@ -89,12 +87,12 @@ export function isValid(c: Constraint, activity: Activity, pos: WeekCoordinate, 
             }
 
             // we will ONLY even consider scheduling the activity if no one else in our grouping is busy
-            const colList = weekSchedule[pos.day].getSchedule().map(row => row[pos.col]);
+            const colList = weekIndex[cell.day].getSchedule().map(row => row[cell.col]);
 
             let canSchedule = true; // all of the groups in our grouping are either already participating in the activity or are free
             let isBeingDoneByGroupingMemeber = false;
             for (let i = 0; i < colList.length; ++i) {
-                const currGroup: Group | undefined = weekSchedule[pos.day].getGroup(i); // this is unsafe
+                const currGroup: Group | undefined = weekIndex[cell.day].getGroup(i); // this is unsafe
                 if (currGroup === undefined) { continue; }
                 const currActivity: string | null = colList[i];
 

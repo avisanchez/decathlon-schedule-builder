@@ -1,6 +1,5 @@
-import { Activity } from "../activity/types"
+import { Activity, DayScheduleIndex, WeekSchedule, WeekScheduleCoordinate } from "../types"
 import { Constraint } from "../schedule/ConstraintList";
-import { Coordinate, DaySchedule, Schedule } from "./types"
 import { isValid } from "./utils";
 
 /**
@@ -18,33 +17,33 @@ class Scheduler {
     private MAX_ITERATIONS = 10000;
 
     constructor() {
-        this.weekSchedule = [];
+        this.weekIndex = [];
         this.activities = [];
         this.constraints = [];
     }
 
-    public init(weekSchedule: DaySchedule[], activities: Activity[], constraints: Constraint[]) {
-        this.weekSchedule = weekSchedule;
+    public init(weekIndex: DayScheduleIndex[], activities: Activity[], constraints: Constraint[]) {
+        this.weekIndex = weekIndex;
         this.activities = activities;
         this.constraints = constraints;
     }
 
-    public run(): Schedule[] {
-        if (this.weekSchedule.length === 0) {
+    public run(): WeekSchedule {
+        if (this.weekIndex.length === 0) {
             throw new Error("Nothing to be done. It is likely that init() was forgotten.")
         }
         this.reset();
         this.genDaySchedule();
-        console.log("The best schedule found was", this.bestSchedule[0]);
-        return this.bestSchedule[0];
+        console.log("The best schedule found was", this.bestWeekSchedule);
+        return this.bestWeekSchedule;
     }
 
     /**
      * Reset all scheduling variables to their inital values.
      */
     private reset() {
-        this.currSchedule = this.weekSchedule.map(daySchedule => daySchedule.getSchedule());
-        this.bestSchedule = [];
+        this.weekSchedule = this.weekIndex.map(dayIndex => dayIndex.getSchedule());
+        this.bestWeekSchedule = [];
         this.currScore = 0;
         this.bestScore = -Infinity;
         this.numCellsToFill = this.countCellsToFill();
@@ -60,18 +59,18 @@ class Scheduler {
      * 
      * @returns The coordinate of the next cell to fill.
      */
-    private getNextCell(): { cell: Coordinate, scheduleIndex: number } {
-        for (let i = 0; i < this.currSchedule.length; ++i) {
-            for (let j = 0; j < this.currSchedule[i].length; ++j) {
-                for (let k = 0; k < this.currSchedule[i][j].length; ++k) {
-                    if (this.currSchedule[i][j][k] === null) {
-                        return { cell: { row: j, col: k }, scheduleIndex: i }
+    private getNextCell(): WeekScheduleCoordinate | null {
+        for (let i = 0; i < this.weekSchedule.length; ++i) {
+            for (let j = 0; j < this.weekSchedule[i].length; ++j) {
+                for (let k = 0; k < this.weekSchedule[i][j].length; ++k) {
+                    if (this.weekSchedule[i][j][k] === null) {
+                        return { day: i, row: j, col: k };
                     }
                 }
             }
         }
-        console.error(`${this.getNextCell.name} was called when there were no empty cells.`)
-        return { cell: { row: -1, col: -1 }, scheduleIndex: -1 };
+        console.error(`${this.getNextCell.name} found no empty cells.`)
+        return null;
     }
 
     /**
@@ -79,7 +78,7 @@ class Scheduler {
      * @param cell The cell for which to retrieve the available activities.
      * @returns An array of available activities.
      */
-    private getValidActivities(cell: Coordinate): Activity[] {
+    private getValidActivities(cell: WeekScheduleCoordinate): Activity[] {
         let validActivities: Activity[] = [];
 
         for (let i = 0; i < this.activities.length; ++i) {
@@ -90,14 +89,14 @@ class Scheduler {
 
                 // deal with fuckass mandatory constraints differntly
                 if (constraint.type === "mandatory") {
-                    const applicable = constraint.time === this.weekSchedule[this.currScheduleIndex].getTime(cell.col);
+                    const applicable = constraint.time === this.weekIndex[cell.day].getTime(cell.col);
                     if (applicable) {
                         if (constraint.activity === activity.code) {
                             return [{ code: activity.code ?? "[ERROR]" }]
                         }
                     }
                 }
-                const passed = isValid(constraint, activity, { day: this.currScheduleIndex, row: cell.row, col: cell.col }, this.weekSchedule);
+                const passed = isValid(constraint, activity, cell, this.weekIndex);
                 valid = valid && passed;
             }
             if (valid) validActivities.push(activity);
@@ -111,10 +110,10 @@ class Scheduler {
      */
     private countCellsToFill(): number {
         let numCellsToFill: number = 0;
-        for (let i = 0; i < this.currSchedule.length; ++i) {
-            for (let j = 0; j < this.currSchedule[i].length; ++j) {
-                for (let k = 0; k < this.currSchedule[i][j].length; ++k) {
-                    if (this.currSchedule[i][j][k] === null) {
+        for (let i = 0; i < this.weekSchedule.length; ++i) {
+            for (let j = 0; j < this.weekSchedule[i].length; ++j) {
+                for (let k = 0; k < this.weekSchedule[i][j].length; ++k) {
+                    if (this.weekSchedule[i][j][k] === null) {
                         numCellsToFill += 1;
                     }
                 }
@@ -161,7 +160,7 @@ class Scheduler {
         this.iterations++;
 
         if (this.iterations > this.MAX_ITERATIONS) {
-            this.bestSchedule.push(structuredClone(this.currSchedule));
+            this.bestWeekSchedule = structuredClone(this.weekSchedule);
             console.error(`${this.genDaySchedule.name} reached the maximum number of iterations.`)
             return;
         }
@@ -171,29 +170,16 @@ class Scheduler {
         }
 
         if (this.numCellsToFill == 0) {
-            // start debug
-            console.log("=====");
-            if (this.currScore < this.bestScore) {
-                console.error("There is an issue with pruning. We achieved a schedule with a lower score than the previous best score.");
-                return;
-            } else {
-                console.log("Found a valid schedule!");
-                console.log("Previous best score:", this.bestScore);
-                console.log("Current best score:", this.currScore);
-                console.log(this.currSchedule[this.currScheduleIndex]);
-            }
-            console.log("=====");
-            // end debug
-
             this.bestScore = this.currScore;
-            this.bestSchedule.push(structuredClone(this.currSchedule));
+            this.bestWeekSchedule = structuredClone(this.weekSchedule);
             return;
         }
 
-        const nextCell = this.getNextCell();
-        // this is jank, change later
-        const cell = nextCell.cell;
-        this.currScheduleIndex = nextCell.scheduleIndex;
+        const cell = this.getNextCell();
+
+        if (cell === null) {
+            return console.error("Something went wrong. Attempting to run genDaySchedule when there are no free cells to fill.");
+        }
 
         let availableActivities = this.getValidActivities(cell);
         if (availableActivities.length === 0) { return console.error("found no valid activities"); }
@@ -211,14 +197,14 @@ class Scheduler {
         availableActivities.forEach(activity => {
             if (this.iterations > this.MAX_ITERATIONS) { return; }
             // set activity
-            this.currSchedule[this.currScheduleIndex][cell.row][cell.col] = activity.code;
+            this.weekSchedule[cell.day][cell.row][cell.col] = activity.code;
             this.numCellsToFill--;
             this.currScore++;
 
             this.genDaySchedule();
 
             // unset activity
-            this.currSchedule[this.currScheduleIndex][cell.row][cell.col] = null;
+            this.weekSchedule[cell.day][cell.row][cell.col] = null;
             this.numCellsToFill++;
             this.currScore--;
         });
@@ -226,7 +212,7 @@ class Scheduler {
 
     // A list of available activities to choose from, initalized once
     private activities: Activity[] = [];
-    private weekSchedule: DaySchedule[];
+    private weekIndex: DayScheduleIndex[];
     private constraints: Constraint[];
 
     /** Algorithm vars  */
@@ -235,9 +221,8 @@ class Scheduler {
     private numCellsToFill: number = 0;
     private iterations: number = 0;
 
-    private currScheduleIndex: number = -1;
-    private currSchedule: Schedule[] = [];
-    private bestSchedule: Schedule[][] = [];
+    private weekSchedule: WeekSchedule = [];
+    private bestWeekSchedule: WeekSchedule = [];
 }
 
 export default Scheduler;
