@@ -52,6 +52,27 @@ export function isValid(c: Constraint, activity: Activity, cell: WeekScheduleCoo
             const rowSet = new Set(weekIndex[cell.day].getSchedule()[cell.row]);
             return !rowSet.has(activity.code);
         }
+        case "time": {
+            if (c.activity !== activity.code || c.relative === undefined || c.time === undefined) {
+                return true;
+            }
+
+            const constraintColIndex = weekIndex[cell.day].getColumn(c.time);
+
+            if (constraintColIndex < 0) {
+                console.warn("Time constraint has invalid column. Aborting.");
+                return true;
+            }
+
+            switch (c.relative) {
+                case "before":
+                    return cell.col < constraintColIndex;
+                case "after":
+                    return cell.col > constraintColIndex;
+                default:
+                    return true;
+            }
+        }
         case "group": {
             if (activity.code !== c.activity) { return true; }
             const currGroup: Group | undefined = weekIndex[cell.day].getGroup(cell.row);

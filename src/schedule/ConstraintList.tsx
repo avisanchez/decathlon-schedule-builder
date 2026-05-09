@@ -14,7 +14,7 @@ export type Constraint =
     | { type: "regular" }
     | { type: "mandatory", activity?: string, time?: string }
     | { type: "multi", activity?: string, groupings?: Set<number>[] }
-    | { type: "time", activity?: string, validTimes?: Set<string> }
+    | { type: "time", activity?: string, relative?: "before" | "after", time?: string }
     | { type: "group", activity?: string, allowed?: boolean, groups?: Set<number> }
 
 function ConstraintList({ constraints, onChange }: {
@@ -47,7 +47,7 @@ function ConstraintList({ constraints, onChange }: {
             case "multi":
                 return true; /** @todo: this will have to be more comprehensive later */
             case "time":
-                return c.activity !== undefined && c.validTimes !== undefined;
+                return c.activity !== undefined && c.relative !== undefined && c.time !== undefined;
             case "single":
                 return true;
             case "regular":
@@ -64,8 +64,7 @@ function ConstraintList({ constraints, onChange }: {
                 onClick={() => setFocusIndex(null)}
                 style={{
                     width: "fit-content",
-                    paddingLeft: "10px",
-                    margin: "0px"
+                    paddingLeft: "10px"
                 }}
             >
                 {constraints.map((constraint, i) => {
@@ -209,7 +208,7 @@ function ConstraintListItem({ constraint, focused, onChange }: {
                     <option value={"empty"}></option>
                     <option value={"group"}>Group Membership</option>
                     <option value={"time"}>Time Window</option>
-                    <option value={"multi"}>Multi-Group Activity</option>
+                    {/* <option value={"multi"}>Multi-Group Activity</option> */}
                     <option value={"mandatory"}>Mandatory Activity</option>
                 </select>
             </div>
@@ -390,7 +389,13 @@ function TimeConstraintView({ readOnly, constraint, onChange }: {
     const { activities, times } = useContext(WorkspaceContext);
 
     return (
-        <div>
+        <div
+            style={{
+                display: "flex",
+                gap: "4px",
+                whiteSpace: "nowrap",
+            }}
+        >
             {
                 readOnly ?
                     <span
@@ -402,7 +407,8 @@ function TimeConstraintView({ readOnly, constraint, onChange }: {
                     <select
                         value={constraint.activity}
                         onChange={(e) => {
-                            if (onChange) onChange({ ...constraint, activity: e.target.value });
+                            const newActivity = e.target.value === "" ? undefined : e.target.value;
+                            if (onChange) onChange({ ...constraint, activity: newActivity });
                         }}
                     >
                         <option value={""} />
@@ -419,22 +425,43 @@ function TimeConstraintView({ readOnly, constraint, onChange }: {
             }
             <span> happens </span>
 
-            <select>
-                <option>before</option>
-                <option>at or before</option>
-                <option>after</option>
-                <option>at or after</option>
-            </select>
+            {readOnly ?
+                <span style={{ fontWeight: "bold" }}>
+                    {constraint.relative ?? "{before/after}"}
+                </span>
+                :
+                <select value={constraint.relative}
+                    onChange={(e) => {
+                        const relative = e.target.value === "" ? undefined : e.target.value as ("before" | "after");
+                        if (onChange) onChange({ ...constraint, relative: relative });
+                    }}
+                >
+                    <option value={""} />
+                    <option value={"before"}>before</option>
+                    <option value={"after"}>after</option>
+                </select>
+            }
 
-            <select>
-                {times.map(time => {
-                    return (
-                        <option>
-                            {time}
-                        </option>
-                    )
-                })}
-            </select>
+            {readOnly ?
+                <span style={{ fontWeight: "bold" }}>{constraint.time ?? "{time}"}</span>
+                :
+                <select value={constraint.time ?? ""}
+                    onChange={(e) => {
+                        const newTime = e.target.value === "" ? undefined : e.target.value;
+                        if (onChange) onChange({ ...constraint, time: newTime });
+                    }}
+                >
+                    <option value={""} />
+                    {times.map(time => {
+                        return (
+                            <option value={time}>
+                                {time}
+                            </option>
+                        )
+                    })}
+                </select>
+            }
+
         </div>
     )
 }

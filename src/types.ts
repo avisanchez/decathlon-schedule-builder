@@ -146,6 +146,10 @@ export class DayScheduleIndex {
         return this.timeSlots[col];
     }
 
+    public getColumn(time: string): number {
+        return this.timeSlots.indexOf(time);
+    }
+
     private timeSlots: string[];
     private groups: Group[];
     private schedule: DaySchedule;
